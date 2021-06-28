@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 #endif
-#if 1
+#if 0
 #include "iknpote.h"
 int main()
 {
@@ -212,6 +212,31 @@ int main()
     iknpReceiver.getEncKeyFromNpot(pk0buf, pk0bufSize);
     //iknp sender
     iknpSender.getDecKeyFromNpot();
+    return 0;
+}
+#endif
+#if 1
+#include "channel.h"
+int main(int argc, char *argv[])
+{
+    int port = 7777;
+    char addr[] = "127.0.0.1";
+    void *sender = NULL;
+    void *recv = NULL;
+    int ptype = atoi(argv[1]);
+    if (ptype == SENDER)
+    {
+        sender = initChannel(SENDER, addr, port);
+        if (sender)
+        {
+            printf("sender init ok...\n");
+        }
+        freeChannel(sender);
+    }
+    if (ptype == RECEIVER)
+    {
+        recv = initChannel(RECEIVER, addr, port);
+    }
     return 0;
 }
 #endif

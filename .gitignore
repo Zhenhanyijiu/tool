@@ -1,6 +1,6 @@
 .vscode
 libOTe
 .idea
-.channel/.idea
-.oprf/.idea
-.oprf/test_np
+channel/.idea
+oprf/.idea
+oprf/test_np
