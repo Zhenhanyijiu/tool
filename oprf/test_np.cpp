@@ -224,18 +224,44 @@ int main(int argc, char *argv[])
     void *sender = NULL;
     void *recv = NULL;
     int ptype = atoi(argv[1]);
-    if (ptype == SENDER)
+    if (ptype == SENDER) //0
     {
         sender = initChannel(SENDER, addr, port);
         if (sender)
         {
             printf("sender init ok...\n");
         }
+        else
+        {
+            return -1;
+        }
+        char buff[] = "hello";
+        int fg = send_data(sender, buff, 5);
+        printf("===fg:%d\n", fg);
+        char recv_buff[100] = {0};
+        fg = recv_data(sender, recv_buff, 100);
+        printf("===fg:%d,buff:%s\n", fg, recv_buff);
+        // sleep(1);
         freeChannel(sender);
     }
     if (ptype == RECEIVER)
     {
         recv = initChannel(RECEIVER, addr, port);
+        if (recv)
+        {
+            printf("recv init ok...\n");
+        }
+        else
+        {
+            return -2;
+        }
+        char buff[100] = {0};
+        int n = recv_data(recv, buff, 100);
+        printf("===n:%d\n", n);
+        printf("===buff:%s\n", buff);
+        memcpy(buff + 5, " yyn", 4);
+        send_data(recv, buff, 9);
+        freeChannel(recv);
     }
     return 0;
 }

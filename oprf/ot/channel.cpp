@@ -7,12 +7,58 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <sys/time.h>
+typedef struct Timeout
+{
+    int is_first;
+    int inerval_sec;
+    struct timeval start;
+    struct timeval end;
+
+} Timeout;
+Timeout *new_timiout(int second)
+{
+    Timeout *t = (Timeout *)malloc(sizeof(Timeout));
+    if (t)
+    {
+        t->is_first = 1;
+        t->inerval_sec = second;
+    }
+    return t;
+}
+int is_timeout(Timeout **tout)
+{
+    if (tout && *tout)
+    {
+        if ((*tout)->is_first)
+        {
+            (*tout)->is_first = 0;
+            gettimeofday(&(*tout)->start, NULL);
+            return 0;
+        }
+        else
+        {
+            gettimeofday(&(*tout)->end, NULL);
+            int time_use = ((*tout)->end.tv_sec - (*tout)->start.tv_sec) * 1000000 +
+                           ((*tout)->end.tv_usec - (*tout)->start.tv_usec);
+            if (time_use >= (*tout)->inerval_sec * 1e6) //set time-out 1s
+            {
+                free(*tout);
+                *tout = NULL;
+                return 1;
+            }
+            return 0;
+        }
+    }
+    return 1;
+}
 struct Channel
 {
     int socket_fd;
     int conn;
 };
-void *initChannel(PartType pltype, char *address, int port)
+void *initChannel(PartType pltype, const char *address, int port)
 {
     if (pltype == SENDER)
     {
@@ -34,13 +80,30 @@ void *initChannel(PartType pltype, char *address, int port)
         stRemoteAddr.sin_addr.s_addr = inet_addr(address);
 
         //连接方法： 传入句柄，目标地址，和大小
-        if (0 > connect(socket_fd, (struct sockaddr *)&stRemoteAddr, sizeof(stRemoteAddr)))
+        Timeout *t = new_timiout(3);
+        while (1)
         {
-            printf("连接失败 connect error！\n");
-            close(socket_fd);
-            //printf("connect failed:%d",errno);//失败时也可打印errno
-            return nullptr;
+            int fg = connect(socket_fd, (struct sockaddr *)&stRemoteAddr, sizeof(stRemoteAddr));
+            if (fg < 0)
+            {
+                // printf("连接失败 connect error,重试中！\n");
+                // close(socket_fd);
+                // return nullptr;
+                if (is_timeout(&t))
+                {
+                    printf("连接失败 connect error！\n");
+                    close(socket_fd);
+                    return nullptr;
+                }
+                continue;
+            }
+            else
+            {
+                printf("连接成功！\n");
+                break;
+            }
         }
+
         // printf("连接成功！\n");
         // recv(iSocketFD, buf, sizeof(buf), 0);
         //将接收数据打入buf，参数分别是句柄，储存处，最大长度，其他信息（设为0即可）。 
@@ -53,7 +116,7 @@ void *initChannel(PartType pltype, char *address, int port)
         }
         ch->socket_fd = -1;
         ch->conn = -1;
-        ch->socket_fd = socket_fd;
+        ch->conn = socket_fd;
         return ch;
     }
     if (pltype == RECEIVER)
@@ -128,16 +191,63 @@ int freeChannel(void *ch)
     if (ch)
     {
         Channel *c = (Channel *)ch;
-        if (c->socket_fd >= 0)
-        {
-            close(c->socket_fd);
-        }
         if (c->conn >= 0)
         {
             close(c->conn);
+        }
+        if (c->socket_fd >= 0)
+        {
+            close(c->socket_fd);
         }
         free(ch);
         ch = NULL;
     }
     return 0;
+}
+
+int send_data(void *channel, const char *buff, int buf_size)
+{
+    if (channel == NULL || buf_size < 0)
+    {
+        return -120;
+    }
+    if (buf_size == 0)
+    {
+        return 0;
+    }
+    uint32_t headlen = (uint32_t)buf_size;
+    Channel *chan = (Channel *)channel;
+    char head[4] = {0};
+    memcpy(head, (char *)&headlen, 4);
+    ssize_t n = send(chan->conn, head, 4, 0);
+    if (n < 0)
+    {
+        return -121;
+    }
+    n = send(chan->conn, buff, buf_size, 0);
+    if (n < 0)
+    {
+        return -1;
+    }
+    return 0;
+}
+int recv_data(void *channel, char *buff_output, int buf_size)
+{
+    if (channel == NULL || buf_size <= 0)
+    {
+        return -122;
+    }
+    Channel *chan = (Channel *)channel;
+    uint32_t headlen = 0;
+    int n = recv(chan->conn, (char *)&headlen, 4, 0);
+    if (n != 4)
+    {
+        return -110;
+    }
+    n = recv(chan->conn, buff_output, headlen, 0);
+    if (n < 0)
+    {
+        return -111;
+    }
+    return n;
 }
