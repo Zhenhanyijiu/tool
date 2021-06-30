@@ -32,8 +32,8 @@ namespace osuCrypto
         }
         for (int i = 0; i < gOtExtBaseOtCount; i++)
         {
-            mGens[i][0].SetSeed(encKey[i][0]);
-            mGens[i][1].SetSeed(encKey[i][1]);
+            this->mGens[i][0].SetSeed(encKey[i][0]);
+            this->mGens[i][1].SetSeed(encKey[i][1]);
             // cout << "第" << i + 1 << "对消息：\n";
             // cout << "" << (0) << ":" << encKey[i][0] << endl;
             // cout << "" << (1) << ":" << encKey[i][1] << endl;
@@ -230,13 +230,17 @@ namespace osuCrypto
     int IknpOtExtSender::genPK0FromNpot(u8 *pubParamBuf, const u64 pubParamBufByteSize,
                                         u8 **pk0Buf, u64 &pk0BufSize)
     {
-        return this->npreceiver.genPK0(pubParamBuf, pubParamBufByteSize,
-                                       this->mBaseChoiceBits, pk0Buf, pk0BufSize);
-    }
-    int IknpOtExtSender::getDecKeyFromNpot()
-    {
+        int fg = this->npreceiver.genPK0(pubParamBuf, pubParamBufByteSize,
+                                         this->mBaseChoiceBits, pk0Buf, pk0BufSize);
+        if (fg != 0)
+        {
+            return fg;
+        }
+        //并生成decKey,存到mGens中，备用
+        // int getDecKeyFromNpot();
+        /**********生成mGens start***********/
         vector<block> decKeys;
-        int fg = this->npreceiver.getDecKey(decKeys);
+        fg = this->npreceiver.getDecKey(decKeys);
         if (fg != 0)
         {
             return fg;
@@ -252,10 +256,32 @@ namespace osuCrypto
             // cout << "第" << i + 1 << "对消息：\n";
             // cout << "" << (0) << ":" << decKeys[i] << endl;
         }
+        /**********生成mGens end  ***********/
         return 0;
     }
+    // int IknpOtExtSender::getDecKeyFromNpot()
+    // {
+    //     vector<block> decKeys;
+    //     int fg = this->npreceiver.getDecKey(decKeys);
+    //     if (fg != 0)
+    //     {
+    //         return fg;
+    //     }
+    //     if (decKeys.size() != gOtExtBaseOtCount)
+    //     {
+    //         return -11;
+    //     }
+    //     // cout << "vectorbit,choices:" << this->mBaseChoiceBits << endl;
+    //     for (int i = 0; i < gOtExtBaseOtCount; i++)
+    //     {
+    //         this->mGens[i].SetSeed(decKeys[i]);
+    //         // cout << "第" << i + 1 << "对消息：\n";
+    //         // cout << "" << (0) << ":" << decKeys[i] << endl;
+    //     }
+    //     return 0;
+    // }
     int IknpOtExtSender::getEncMsg(const vector<block> &uBuffInput,
-                                   vector<array<block, 2>> encMsgOutput)
+                                   vector<array<block, 2>> &encMsgOutput)
     {
         // round up
         u64 numOtExt = roundUpTo(encMsgOutput.size(), 128);
@@ -298,9 +324,9 @@ namespace osuCrypto
             {
                 // generate the columns using AES-NI in counter mode.
                 //生成t
-                mGens[colIdx].mAes.ecbEncCounterMode(mGens[colIdx].mBlockIdx,
-                                                     superBlkSize, tIter);
-                mGens[colIdx].mBlockIdx += superBlkSize;
+                this->mGens[colIdx].mAes.ecbEncCounterMode(this->mGens[colIdx].mBlockIdx,
+                                                           superBlkSize, tIter);
+                this->mGens[colIdx].mBlockIdx += superBlkSize;
 
                 uIter[0] = uIter[0] & *cIter;
                 uIter[1] = uIter[1] & *cIter;

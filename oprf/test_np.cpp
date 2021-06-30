@@ -6,9 +6,56 @@
 #include "cryptoTools/Common/Defines.h"
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Crypto/RandomOracle.h"
+#include "iknpote.h"
+#include "naorpinkas.h"
+#include <string.h>
+#include <algorithm>
+#include "channel.h"
+#include <assert.h>
 namespace oc = osuCrypto;
 
 using namespace std;
+void printOTMsg(const vector<array<oc::block, 2>> &otMsg)
+{
+    int num = otMsg.size();
+    for (int i = 0; i < num; i++)
+    {
+        cout << "第" << i + 1 << "对消息：\n";
+        cout << "" << (0) << ":" << otMsg[i][0] << endl;
+        cout << "" << (1) << ":" << otMsg[i][1] << endl;
+    }
+}
+void printOTMsgSingle(const vector<oc::block> &otMsg)
+{
+    int num = otMsg.size();
+    for (int i = 0; i < num; i++)
+    {
+        cout << "第" << i + 1 << "个消息：" << otMsg[i] << endl;
+        // cout << "" << (1) << ":" << otMsg[i][1] << endl;
+    }
+}
+void check_recover(const vector<array<oc::block, 2>> &otMsg,
+                   const oc::BitVector &rChoices, const vector<oc::block> &otMsgRecover)
+{
+    int size = otMsg.size();
+    if (size != rChoices.size() || size != otMsgRecover.size())
+    {
+        printf("=======check error!!! error\n");
+        return;
+    }
+    for (int i = 0; i < size; i++)
+    {
+        oc::u8 r = rChoices[i];
+        cout << "第" << i + 1 << "对：\n";
+        cout << "src:" << otMsg[i][r] << ",recover:" << otMsgRecover[i] << endl;
+        if (neq(otMsg[i][r], otMsgRecover[i]))
+        {
+            printf("=======src is not equal recover");
+            exit(-1);
+        }
+        printf("===check_recover ok...\n");
+    }
+}
 // using RandomOracle = oc::Blake2;
 #if 0
 int main()
@@ -87,9 +134,6 @@ int main()
 }
 #endif
 #if 0
-#include "naorpinkas.h"
-#include <string.h>
-#include <algorithm>
 void genOTMsg(vector<array<oc::block, 2>> &otMsg)
 {
     oc::PRNG rng(oc::toBlock(0x1122334455));
@@ -101,37 +145,7 @@ void genOTMsg(vector<array<oc::block, 2>> &otMsg)
         otMsg[i][1] = rng.get<oc::block>();
     }
 }
-void printOTMsg(const vector<array<oc::block, 2>> &otMsg)
-{
-    int num = otMsg.size();
-    for (int i = 0; i < num; i++)
-    {
-        cout << "第" << i + 1 << "对消息：\n";
-        cout << "" << (0) << ":" << otMsg[i][0] << endl;
-        cout << "" << (1) << ":" << otMsg[i][1] << endl;
-    }
-}
-void check_recover(const vector<array<oc::block, 2>> &otMsg,
-                   const oc::BitVector rChoices, const vector<oc::block> otMsgRecover)
-{
-    int size = otMsg.size();
-    if (size != rChoices.size() || size != otMsgRecover.size())
-    {
-        printf("=======check error!!! error\n");
-        return;
-    }
-    for (int i = 0; i < size; i++)
-    {
-        oc::u8 r = rChoices[i];
-        cout << "第" << i + 1 << "对：\n";
-        cout << "src:" << otMsg[i][r] << ",recover:" << otMsgRecover[i] << endl;
-        if (neq(otMsg[i][r], otMsgRecover[i]))
-        {
-            printf("=======src is not equal recover");
-            exit(-1);
-        }
-    }
-}
+
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -191,10 +205,15 @@ int main(int argc, char *argv[])
     return 0;
 }
 #endif
+//iknp test(not use socket)
 #if 0
-#include "iknpote.h"
-int main()
+int main(int argc, char *argv[])
 {
+    int width = 100;
+    if (argc != 1)
+    {
+        width = atoi(argv[1]);
+    }
     oc::PRNG rng(oc::toBlock(0x112233));
     //iknp 接收者
     oc::IknpOtExtReceiver iknpReceiver;
@@ -211,22 +230,162 @@ int main()
     //iknp receiver
     iknpReceiver.getEncKeyFromNpot(pk0buf, pk0bufSize);
     //iknp sender
-    iknpSender.getDecKeyFromNpot();
+    // iknpSender.getDecKeyFromNpot();
+    // int width = 100;
+    oc::BitVector choicesWidthInput(width);
+    choicesWidthInput.randomize(rng);
+    vector<oc::block> recoverMsgWidthOutput;
+    vector<oc::block> uBuffOutput;
+    //iknp receiver
+    int fg = iknpReceiver.genRecoverMsg(choicesWidthInput, recoverMsgWidthOutput, uBuffOutput);
+    if (fg)
+    {
+        printf("1====error:%d\n", fg);
+        return -1;
+    }
+    printOTMsgSingle(recoverMsgWidthOutput);
+    cout << "===choicesWidthInput:" << choicesWidthInput << endl;
+    //iknp sender
+    vector<array<oc::block, 2>> encMsgOutput(width);
+    fg = iknpSender.getEncMsg(uBuffOutput, encMsgOutput);
+    if (fg)
+    {
+        printf("2====error:%d\n", fg);
+        return -1;
+    }
+    printOTMsg(encMsgOutput);
+    check_recover(encMsgOutput, choicesWidthInput, recoverMsgWidthOutput);
     return 0;
 }
 #endif
+//iknp test(use socket)
 #if 1
+char address[] = "127.0.0.1";
+int port = 7878;
+int main(int argc, char *argv[])
+{
+    int width = 100;
+    if (argc != 3)
+    {
+        printf("argc != 3 error\n");
+        printf("./a.out partType(0 or 1) width");
+        return -1;
+    }
+
+    width = atoi(argv[2]);
+    int ptype = atoi(argv[1]);
+    if (ptype == CLIENT)
+    {
+        void *client = initChannel(CLIENT, address, port);
+        assert(client != nullptr);
+        oc::PRNG rng(oc::toBlock(0x112233));
+        //iknp 接收者
+        oc::IknpOtExtReceiver iknpReceiver;
+        iknpReceiver.init(rng);
+        oc::u8 *pubParamBuf = nullptr;
+        oc::u64 pubParamBufSize = 0;
+        int fg = iknpReceiver.genPublicParamFromNpot(&pubParamBuf, pubParamBufSize);
+        if (fg)
+        {
+            printf("===genPublicParamFromNpot fg:%d\n", fg);
+            return -1;
+        }
+
+        //发送公共参数
+        int n = send_data(client, (char *)pubParamBuf, pubParamBufSize);
+        assert(n == pubParamBufSize);
+        char *pk0buf = NULL;
+        //接收pk0buf;
+        n = recv_data(client, &pk0buf);
+        assert(n > 0);
+        fg = iknpReceiver.getEncKeyFromNpot((oc::u8 *)pk0buf, n);
+        if (fg)
+        {
+            printf("===getEncKeyFromNpot fg:%d\n", fg);
+            return -1;
+        }
+        //生成ubuff
+        oc::BitVector choicesWidthInput(width);
+        choicesWidthInput.randomize(rng);
+        vector<oc::block> recoverMsgWidthOutput;
+        vector<oc::block> uBuffOutput;
+        cout << "===choicesWidthInput:" << choicesWidthInput << endl;
+        //iknp receiver
+        fg = iknpReceiver.genRecoverMsg(choicesWidthInput, recoverMsgWidthOutput, uBuffOutput);
+        if (fg)
+        {
+            printf("1====error:%d\n", fg);
+            return -1;
+        }
+        //发送ubuff
+        int buff_size = uBuffOutput.size() * sizeof(oc::block);
+        n = send_data(client, (char *)uBuffOutput.data(), buff_size);
+        assert(n == buff_size);
+        printOTMsgSingle(recoverMsgWidthOutput);
+        return 0;
+    }
+    if (ptype == SERVER)
+    {
+        void *server = initChannel(SERVER, address, port);
+        assert(server != nullptr);
+        oc::PRNG rng(oc::toBlock(0x11223377));
+        //iknp 发送者
+        oc::IknpOtExtSender iknpSender;
+        iknpSender.init(rng); //默认128对
+        //接收公共参数
+        char *pubParamBuf = nullptr;
+        int n = recv_data(server, &pubParamBuf);
+        assert(n > 0);
+        //生成pk0buf并发送
+        oc::u8 *pk0buf = nullptr;
+        oc::u64 pk0bufSize = 0;
+        int fg = iknpSender.genPK0FromNpot((oc::u8 *)pubParamBuf, n, &pk0buf, pk0bufSize);
+        assert(fg == 0);
+        //发送给对方
+        n = send_data(server, (char *)pk0buf, pk0bufSize);
+        assert(n == pk0bufSize);
+        //生成deckey
+        // fg = iknpSender.getDecKeyFromNpot();
+        // assert(fg == 0);
+        char *ubuff = NULL;
+        n = recv_data(server, &ubuff);
+        assert(n > 0);
+        vector<array<oc::block, 2>> encMsgOutput(width);
+        int ublocksize = n / sizeof(oc::block);
+        vector<oc::block> ubuff_vec(ublocksize);
+        oc::block *bb = (oc::block *)ubuff;
+        for (int i = 0; i < ublocksize; i++)
+        {
+            ubuff_vec[i] = *(bb + i);
+        }
+        fg = iknpSender.getEncMsg(ubuff_vec, encMsgOutput);
+        if (fg)
+        {
+            printf("2====error:%d\n", fg);
+            return -1;
+        }
+        printOTMsg(encMsgOutput);
+    }
+    return 0;
+}
+#endif
+//channel test
+#if 0
 #include "channel.h"
 int main(int argc, char *argv[])
 {
+    if (argc != 2)
+    {
+        return -1;
+    }
     int port = 7777;
     char addr[] = "127.0.0.1";
     void *sender = NULL;
     void *recv = NULL;
     int ptype = atoi(argv[1]);
-    if (ptype == SENDER) //0
+    if (ptype == CLIENT) //0
     {
-        sender = initChannel(SENDER, addr, port);
+        sender = initChannel(CLIENT, addr, port);
         if (sender)
         {
             printf("sender init ok...\n");
@@ -238,15 +397,16 @@ int main(int argc, char *argv[])
         char buff[] = "hello";
         int fg = send_data(sender, buff, 5);
         printf("===fg:%d\n", fg);
-        char recv_buff[100] = {0};
-        fg = recv_data(sender, recv_buff, 100);
+        char *recv_buff;
+
+        fg = recv_data(sender, &recv_buff);
         printf("===fg:%d,buff:%s\n", fg, recv_buff);
         // sleep(1);
         freeChannel(sender);
     }
-    if (ptype == RECEIVER)
+    if (ptype == SERVER)
     {
-        recv = initChannel(RECEIVER, addr, port);
+        recv = initChannel(SERVER, addr, port);
         if (recv)
         {
             printf("recv init ok...\n");
@@ -256,9 +416,11 @@ int main(int argc, char *argv[])
             return -2;
         }
         char buff[100] = {0};
-        int n = recv_data(recv, buff, 100);
+        char *recv_buff;
+        int n = recv_data(recv, &recv_buff);
         printf("===n:%d\n", n);
         printf("===buff:%s\n", buff);
+        memcpy(buff, recv_buff, n);
         memcpy(buff + 5, " yyn", 4);
         send_data(recv, buff, 9);
         freeChannel(recv);

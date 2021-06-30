@@ -49,10 +49,8 @@ namespace osuCrypto
         //接收对方发送过来的公共参数，并根据choices输入生成pk0s,并发送过对方
         int genPK0FromNpot(u8 *pubParamBuf, const u64 pubParamBufByteSize,
                            u8 **pk0Buf, u64 &pk0BufSize);
-        //并生成decKey,存到mGens中，备用
-        int getDecKeyFromNpot();
         //uBuffInput对方发送过来的，作为输入，encMsgOutput为输出，大小在外部初始化
-        int getEncMsg(const vector<block> &uBuffInput, vector<array<block, 2>> encMsgOutput);
+        int getEncMsg(const vector<block> &uBuffInput, vector<array<block, 2>> &encMsgOutput);
     };
 
 }

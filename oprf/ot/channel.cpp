@@ -9,6 +9,10 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/time.h>
+#include "assert.h"
+//30M
+#define RECV_BUFF_SIZE 1024 * 1024 * 30
+// #define RECV_BUFF_SIZE 256
 typedef struct Timeout
 {
     int is_first;
@@ -53,14 +57,17 @@ int is_timeout(Timeout **tout)
     }
     return 1;
 }
+
 struct Channel
 {
     int socket_fd;
     int conn;
+    char *recv_buff;
+    int recv_buff_len;
 };
 void *initChannel(PartType pltype, const char *address, int port)
 {
-    if (pltype == SENDER)
+    if (pltype == CLIENT)
     {
         int socket_fd = 0; //socket句柄
         unsigned int iRemoteAddr = 0;
@@ -80,7 +87,7 @@ void *initChannel(PartType pltype, const char *address, int port)
         stRemoteAddr.sin_addr.s_addr = inet_addr(address);
 
         //连接方法： 传入句柄，目标地址，和大小
-        Timeout *t = new_timiout(3);
+        Timeout *t = new_timiout(10);
         while (1)
         {
             int fg = connect(socket_fd, (struct sockaddr *)&stRemoteAddr, sizeof(stRemoteAddr));
@@ -114,12 +121,21 @@ void *initChannel(PartType pltype, const char *address, int port)
             close(socket_fd);
             return nullptr;
         }
+        ch->recv_buff = (char *)malloc(RECV_BUFF_SIZE); //100M
+        if (ch->recv_buff == NULL)
+        {
+            free(ch);
+            close(socket_fd);
+            return nullptr;
+        }
+        ch->recv_buff_len = RECV_BUFF_SIZE;
         ch->socket_fd = -1;
         ch->conn = -1;
         ch->conn = socket_fd;
+        memset(ch->recv_buff, 0, ch->recv_buff_len);
         return ch;
     }
-    if (pltype == RECEIVER)
+    if (pltype == SERVER)
     {
         //调用socket函数返回的文件描述符
         int socket_fd;
@@ -169,18 +185,29 @@ void *initChannel(PartType pltype, const char *address, int port)
             printf("accept error\n");
             return nullptr;
         }
+
         Channel *ch = (Channel *)malloc(sizeof(Channel));
         if (ch == NULL)
         {
-            close(socket_fd);
             close(conn);
+            close(socket_fd);
             return nullptr;
         }
+        ch->recv_buff = (char *)malloc(1024 * 1024 * 100); //100M
+        if (ch->recv_buff == NULL)
+        {
+            free(ch);
+            close(conn);
+            close(socket_fd);
+            return nullptr;
+        }
+        ch->recv_buff_len = 1024 * 1024 * 100;
         ch->socket_fd = -1;
         ch->conn = -1;
         printf("accept ok...\n");
         ch->socket_fd = socket_fd;
         ch->conn = conn;
+        memset(ch->recv_buff, 0, ch->recv_buff_len);
         return ch;
     }
 
@@ -199,6 +226,7 @@ int freeChannel(void *ch)
         {
             close(c->socket_fd);
         }
+        free(c->recv_buff);
         free(ch);
         ch = NULL;
     }
@@ -217,23 +245,21 @@ int send_data(void *channel, const char *buff, int buf_size)
     }
     uint32_t headlen = (uint32_t)buf_size;
     Channel *chan = (Channel *)channel;
-    char head[4] = {0};
-    memcpy(head, (char *)&headlen, 4);
-    ssize_t n = send(chan->conn, head, 4, 0);
-    if (n < 0)
+    // char head[4] = {0};
+    // memcpy(head, (char *)&headlen, 4);
+    ssize_t n = send(chan->conn, (char *)&headlen, 4, 0);
+    assert(n == 4);
+    if (n != 4)
     {
         return -121;
     }
     n = send(chan->conn, buff, buf_size, 0);
-    if (n < 0)
-    {
-        return -1;
-    }
-    return 0;
+    assert(n == buf_size);
+    return n;
 }
-int recv_data(void *channel, char *buff_output, int buf_size)
+int recv_data(void *channel, char **buff_output)
 {
-    if (channel == NULL || buf_size <= 0)
+    if (channel == NULL)
     {
         return -122;
     }
@@ -244,10 +270,23 @@ int recv_data(void *channel, char *buff_output, int buf_size)
     {
         return -110;
     }
-    n = recv(chan->conn, buff_output, headlen, 0);
-    if (n < 0)
+    //空间不够
+    if (headlen > chan->recv_buff_len)
+    {
+        char *tmp_buf = (char *)realloc(chan->recv_buff, headlen);
+        if (tmp_buf == NULL)
+        {
+            return -112;
+        }
+        chan->recv_buff = tmp_buf;
+        chan->recv_buff_len = headlen;
+        memset(chan->recv_buff, 0, headlen);
+    }
+    n = recv(chan->conn, chan->recv_buff, headlen, 0);
+    if (n < 0 || n != headlen)
     {
         return -111;
     }
+    *buff_output = chan->recv_buff;
     return n;
 }
