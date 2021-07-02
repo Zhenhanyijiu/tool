@@ -261,6 +261,7 @@ int recv_data(void *channel, char **buff_output)
 {
     if (channel == NULL)
     {
+        printf("error...1\n");
         return -122;
     }
     Channel *chan = (Channel *)channel;
@@ -268,6 +269,7 @@ int recv_data(void *channel, char **buff_output)
     int n = recv(chan->conn, (char *)&headlen, 4, 0);
     if (n != 4)
     {
+        printf("error...2\n");
         return -110;
     }
     //空间不够
@@ -276,17 +278,37 @@ int recv_data(void *channel, char **buff_output)
         char *tmp_buf = (char *)realloc(chan->recv_buff, headlen);
         if (tmp_buf == NULL)
         {
+            printf("error...3\n");
             return -112;
         }
         chan->recv_buff = tmp_buf;
         chan->recv_buff_len = headlen;
         memset(chan->recv_buff, 0, headlen);
     }
-    n = recv(chan->conn, chan->recv_buff, headlen, 0);
-    if (n < 0 || n != headlen)
+    //这里要循环接收数据
+    int offset = 0;
+    int remain_len = headlen;
+    // int count = 0;
+    while (1)
     {
-        return -111;
+        n = recv(chan->conn, chan->recv_buff + offset, remain_len, 0);
+        if (n < 0)
+        {
+            printf("error...4,n(%d),headlen(%d)\n", n, headlen);
+            return -111;
+        }
+        // count++;
+        offset += n;
+        if (offset < headlen)
+        {
+            remain_len = headlen - offset;
+            continue;
+        }
+        else
+        {
+            break;
+        }
     }
     *buff_output = chan->recv_buff;
-    return n;
+    return headlen;
 }

@@ -12,6 +12,7 @@
 #include <algorithm>
 #include "channel.h"
 #include <assert.h>
+#include <unistd.h>
 namespace oc = osuCrypto;
 
 using namespace std;
@@ -309,7 +310,7 @@ int main(int argc, char *argv[])
         choicesWidthInput.randomize(rng);
         vector<oc::block> recoverMsgWidthOutput;
         vector<oc::block> uBuffOutput;
-        cout << "===choicesWidthInput:" << choicesWidthInput << endl;
+
         //iknp receiver
         fg = iknpReceiver.genRecoverMsg(choicesWidthInput, recoverMsgWidthOutput, uBuffOutput);
         if (fg)
@@ -322,6 +323,10 @@ int main(int argc, char *argv[])
         n = send_data(client, (char *)uBuffOutput.data(), buff_size);
         assert(n == buff_size);
         printOTMsgSingle(recoverMsgWidthOutput);
+        // cout << "===choicesWidthInput:" << choicesWidthInput << endl;
+        printf("===>ubuff_size:%d\n", buff_size);
+        freeChannel(client);
+        // sleep(30);
         return 0;
     }
     if (ptype == SERVER)
@@ -348,7 +353,9 @@ int main(int argc, char *argv[])
         // fg = iknpSender.getDecKeyFromNpot();
         // assert(fg == 0);
         char *ubuff = NULL;
+        printf(">>>>>>>>>>>>>>>>\n");
         n = recv_data(server, &ubuff);
+        printf("===>>>afer recv:n(%d)\n", n);
         assert(n > 0);
         vector<array<oc::block, 2>> encMsgOutput(width);
         int ublocksize = n / sizeof(oc::block);
@@ -365,6 +372,9 @@ int main(int argc, char *argv[])
             return -1;
         }
         printOTMsg(encMsgOutput);
+        freeChannel(server);
+        // sleep(30);
+        return 0;
     }
     return 0;
 }
