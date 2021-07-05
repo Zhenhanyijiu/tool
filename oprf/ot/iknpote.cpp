@@ -62,7 +62,7 @@ namespace osuCrypto
         choices2.resize(numBlocks * 128);
         //转化为block类型
         auto choiceBlocks = choices2.getSpan<block>();
-#if 1 //debug
+#if 0 //debug
         for (int i = 0; i < choiceBlocks.size(); i++)
         {
             cout << "===>>choiceBlock i:" << i << "," << choiceBlocks[i] << endl;
@@ -122,7 +122,7 @@ namespace osuCrypto
                 uIter += 8;
                 tIter += 8;
             }
-            //如果numSuperBlocks>512时，这里需要优化，不过一般512就足够了
+            //如果 numSuperBlocks >512时，这里需要优化，不过一般512就足够了
             if (uIter == uEnd)
             {
                 // send over u buffer
@@ -286,6 +286,8 @@ namespace osuCrypto
         // round up
         u64 numOtExt = roundUpTo(encMsgOutput.size(), 128);
         u64 numSuperBlocks = (numOtExt / 128 + superBlkSize - 1) / superBlkSize;
+        // u64 numSuperBlocks = (numOtExt / 128 + superBlkSize - 1) / superBlkSize;
+        u64 step = std::min<u64>(numSuperBlocks, (u64)commStepSize);
         //u64 numBlocks = numSuperBlocks * superBlkSize;
         // a temp that will be used to transpose the sender's matrix
         std::array<std::array<block, superBlkSize>, 128> t;
@@ -305,6 +307,11 @@ namespace osuCrypto
 
         // block *uIter = (block *)u.data() + superBlkSize * 128 * commStepSize;
         u64 uBuffInputSize = uBuffInput.size();
+        //check ok
+        if (uBuffInputSize != step * 128 * superBlkSize)
+        {
+            return -121;
+        }
         block *uIter = (block *)uBuffInput.data();
         block *uEnd = uIter + uBuffInputSize;
 

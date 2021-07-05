@@ -13,9 +13,42 @@
 #include "channel.h"
 #include <assert.h>
 #include <unistd.h>
+#include <sys/time.h>
 namespace oc = osuCrypto;
 
 using namespace std;
+typedef struct TimeComputeType
+{
+    struct timeval start;
+    struct timeval end;
+} TimeCompute;
+void *newTimeCompute()
+{
+    return malloc(sizeof(TimeCompute));
+}
+void startTime(void *tc)
+{
+    assert(tc != nullptr);
+    TimeCompute *t = (TimeCompute *)tc;
+    gettimeofday(&(t->start), NULL);
+}
+//毫秒
+int getEndTime(void *tc)
+{
+    assert(tc != nullptr);
+    TimeCompute *t = (TimeCompute *)tc;
+    gettimeofday(&(t->end), NULL);
+    int time_use = (t->end.tv_sec - t->start.tv_sec) * 1000000 +
+                   (t->end.tv_usec - t->start.tv_usec);
+    return time_use / 1000.0;
+}
+void freeTimeCompute(void *tc)
+{
+    if (tc)
+    {
+        free(tc);
+    }
+}
 void printOTMsg(const vector<array<oc::block, 2>> &otMsg)
 {
     int num = otMsg.size();
@@ -124,7 +157,7 @@ int main()
     cout << "===>>2...choices2:" << choices2
          << ",numBytes:" << choices2.sizeBytes() << endl;
     auto choiceBlocks = choices2.getSpan<oc::block>();
-    cout << "===>>choiceBlocksSize:" << choiceBlocks.size() << endl; // 8
+    // cout << "===>>choiceBlocksSize:" << choiceBlocks.size() << endl; // 8
     for (int i = 0; i < choiceBlocks.size(); i++)
     {
         cout << "i:" << i << "," << choiceBlocks[i] << endl;
@@ -260,7 +293,7 @@ int main(int argc, char *argv[])
 }
 #endif
 //iknp test(use socket)
-#if 1
+#if 0
 char address[] = "127.0.0.1";
 int port = 7878;
 int main(int argc, char *argv[])
@@ -277,7 +310,10 @@ int main(int argc, char *argv[])
     int ptype = atoi(argv[1]);
     if (ptype == CLIENT)
     {
+        void *t = newTimeCompute();
+        // startTime(t);
         void *client = initChannel(CLIENT, address, port);
+        startTime(t);
         assert(client != nullptr);
         oc::PRNG rng(oc::toBlock(0x112233));
         //iknp 接收者
@@ -322,16 +358,22 @@ int main(int argc, char *argv[])
         int buff_size = uBuffOutput.size() * sizeof(oc::block);
         n = send_data(client, (char *)uBuffOutput.data(), buff_size);
         assert(n == buff_size);
-        printOTMsgSingle(recoverMsgWidthOutput);
+        // printOTMsgSingle(recoverMsgWidthOutput);
         // cout << "===choicesWidthInput:" << choicesWidthInput << endl;
         printf("===>ubuff_size:%d\n", buff_size);
         freeChannel(client);
+        int msTime = getEndTime(t);
+        freeTimeCompute(t);
+        printf("(width=%d)iknp receiver need times:%dms\n", width, msTime);
         // sleep(30);
         return 0;
     }
     if (ptype == SERVER)
     {
+        void *t = newTimeCompute();
+        // startTime(t);
         void *server = initChannel(SERVER, address, port);
+        startTime(t);
         assert(server != nullptr);
         oc::PRNG rng(oc::toBlock(0x11223377));
         //iknp 发送者
@@ -371,11 +413,41 @@ int main(int argc, char *argv[])
             printf("2====error:%d\n", fg);
             return -1;
         }
-        printOTMsg(encMsgOutput);
+        // printOTMsg(encMsgOutput);
         freeChannel(server);
+        int msTime = getEndTime(t);
+        freeTimeCompute(t);
+        printf("(width=%d)iknp sender need times:%dms\n", width, msTime);
         // sleep(30);
         return 0;
     }
+    return 0;
+}
+#endif
+//psi test use socket
+#if 1
+void test(char *aa)
+{
+    aa[0] = 'a';
+    aa[1] = '2';
+    printf("aa:%p\n", aa);
+}
+int main(int argc, char *argv[])
+{
+    int h = 2;
+
+    char aa[h];
+    aa[0] = 'a';
+    aa[1] = 'b';
+    printf("===>>>aa[0]:%c\n", aa[0]);
+    printf("===>>>aa[1]:%c\n", aa[1]);
+    // printf("===>>>aa[2]:%c\n", aa[2]);
+    char *aa1 = new char[2];
+    test(aa1);
+    printf("a0:%c,a1:%c,ptr11:%p\n", aa1[0], aa1[1], aa1);
+
+    delete[] aa1;
+
     return 0;
 }
 #endif
