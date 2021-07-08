@@ -37,7 +37,8 @@ namespace osuCrypto
     PsiReceiver::PsiReceiver() {}
     PsiReceiver::~PsiReceiver() {}
     int PsiReceiver::init(const block &commonSeed, const block &localSeed,
-                          u64 matrixWidth, u64 logHeight, u64 receiverSize)
+                          u64 matrixWidth, u64 logHeight, u64 receiverSize,
+                          u64 hash2LengthInBytes)
     {
         this->matrixWidth = matrixWidth;
         this->matrixWidthInBytes = (matrixWidth + 7) >> 3;
@@ -50,17 +51,13 @@ namespace osuCrypto
         this->bucket2 = 256;
         this->h1LengthInBytes = 32;
         //todo
-        this->hash2LengthInBytes = 16;
-        this->sendMatrixADBuff = (u8 *)malloc(this->heightInBytes * this->matrixWidth);
-        if (this->sendMatrixADBuff == NULL)
-        {
-            return -1;
-        }
+        this->hash2LengthInBytes = hash2LengthInBytes;
+        this->sendMatrixADBuff.resize(this->heightInBytes * this->matrixWidth);
         this->transHashInputs.resize(this->matrixWidth);
         for (auto i = 0; i < this->matrixWidth; ++i)
         {
-            this->transHashInputs[i] = new u8[this->receiverSizeInBytes];
-            memset(this->transHashInputs[i], 0, this->receiverSizeInBytes);
+            this->transHashInputs[i].resize(this->receiverSizeInBytes);
+            memset(this->transHashInputs[i].data(), 0, this->receiverSizeInBytes);
         }
         this->encMsgOutput.resize(this->matrixWidth);
         cout << "===>commonSeed before:" << this->commonSeed << endl;
@@ -68,19 +65,6 @@ namespace osuCrypto
         cout << "===>commonSeed after :" << this->commonSeed << endl;
         PRNG localRng(localSeed);
         return this->iknpOteSender.init(localRng);
-    }
-    //内存释放
-    void PsiReceiver::releasePsiReceiver()
-    {
-        if (this->sendMatrixADBuff)
-        {
-            free(this->sendMatrixADBuff);
-            this->sendMatrixADBuff = NULL;
-        }
-        for (auto i = 0; i < this->matrixWidth; ++i)
-        {
-            delete[] this->transHashInputs[i];
-        }
     }
     int PsiReceiver::genPK0FromNpot(u8 *pubParamBuf, const u64 pubParamBufByteSize,
                                     u8 **pk0Buf, u64 &pk0BufSize)
@@ -196,11 +180,11 @@ namespace osuCrypto
                 // sentMatrix[i] = new u8[this->heightInBytes];
                 prng.SetSeed(this->encMsgOutput[i + wLeft][1]);
                 // prng.get(sentMatrix[i], this->heightInBytes);
-                prng.get(this->sendMatrixADBuff + offset1 + offset2, this->heightInBytes);
+                prng.get(this->sendMatrixADBuff.data() + offset1 + offset2, this->heightInBytes);
                 for (auto j = 0; j < this->heightInBytes; ++j)
                 {
                     // sentMatrix[i][j] ^= matrixA[i][j] ^ matrixDelta[i][j];
-                    (this->sendMatrixADBuff + offset1 + offset2)[j] ^= matrixA[i][j] ^ matrixDelta[i][j];
+                    (this->sendMatrixADBuff.data() + offset1 + offset2)[j] ^= matrixA[i][j] ^ matrixDelta[i][j];
                 }
                 //发送sM^A^D
                 //发送数据U^A^D给对方，
@@ -223,7 +207,7 @@ namespace osuCrypto
         }
         /*********for cycle end*********/
         //将uBuff输出并发送给对方
-        *sendMatrixADBuff = this->sendMatrixADBuff;
+        *sendMatrixADBuff = this->sendMatrixADBuff.data();
         sendMatixADBuffSize = this->heightInBytes * this->matrixWidth;
         /****************************/
         // 最后释放空间
@@ -249,9 +233,9 @@ namespace osuCrypto
             hashInputs[i] = new u8[this->matrixWidthInBytes];
         }
         //接收集合中的每个元素
-        for (auto low = 0; low < receiverSize; low += bucket2)
+        for (auto low = 0; low < receiverSize; low += this->bucket2)
         {
-            auto up = low + bucket2 < receiverSize ? low + bucket2 : receiverSize;
+            auto up = low + this->bucket2 < receiverSize ? low + this->bucket2 : receiverSize;
             for (auto j = low; j < up; ++j)
             {
                 memset(hashInputs[j - low], 0, this->matrixWidthInBytes);
@@ -281,5 +265,234 @@ namespace osuCrypto
         }
         return 0;
     }
-    //psiSender
+    //PsiReceiver,接收对方发来的hash输出
+    int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8 *recvBuff, const u64 recvBufSize,
+                                                     const u64 low, const u64 up,
+                                                     vector<int> &psiMsgIndex)
+    {
+        if (recvBufSize != (up - low) * this->heightInBytes)
+        {
+            return -122;
+        }
+        for (auto idx = 0; idx < up - low; ++idx)
+        {
+            u64 mapIdx = *(u64 *)(recvBuff + idx * this->hash2LengthInBytes);
+            auto found = this->allHashes.find(mapIdx);
+            if (found == this->allHashes.end())
+                continue;
+            //可能找到好几个
+            for (auto i = 0; i < found->second.size(); ++i)
+            {
+                if (memcmp(&(found->second[i].first),
+                           recvBuff + idx * this->hash2LengthInBytes,
+                           this->hash2LengthInBytes) == 0)
+                {
+                    psiMsgIndex.push_back(found->second[i].second);
+                    break;
+                }
+            }
+        }
+        return 0;
+    }
+    //PsiSender
+    PsiSender::PsiSender() {}
+    PsiSender::~PsiSender() {}
+    //初始化
+    int PsiSender::init(const block &commonSeed, const block &localSeed,
+                        u64 matrixWidth, u64 logHeight, u64 senderSize,
+                        u64 hash2LengthInBytes)
+    {
+        this->matrixWidth = matrixWidth;
+        this->matrixWidthInBytes = (matrixWidth + 7) >> 3;
+        this->commonSeed = commonSeed;
+        this->logHeight = logHeight;
+        this->height = 1 << logHeight;
+        this->heightInBytes = (this->height + 7) >> 3; //除以8
+        this->senderSize = senderSize;
+        this->senderSizeInBytes = (senderSize + 7) >> 3;
+        this->bucket1 = 256;
+        this->bucket2 = 256;
+        this->h1LengthInBytes = 32;
+        //todo
+        this->hash2LengthInBytes = hash2LengthInBytes;
+        PRNG localRng(localSeed);
+        //初始化一个向量r，长度为width
+        this->choicesWidthInput.resize(matrixWidth);
+        this->choicesWidthInput.randomize(localRng);
+        this->hashOutputBuff.resize(this->hash2LengthInBytes * this->bucket2);
+        this->hashInputs.resize(this->bucket2);
+        this->transHashInputs.resize(this->matrixWidth);
+        for (int i = 0; i < this->matrixWidth; i++)
+        {
+            this->transHashInputs[i].resize(this->senderSizeInBytes);
+            memset(this->transHashInputs[i].data(), 0, this->senderSizeInBytes);
+        }
+        for (int i = 0; i < this->bucket2; i++)
+        {
+            this->hashInputs[i].resize(this->matrixWidthInBytes);
+        }
+        return this->iknpOteReceiver.init(localRng);
+    }
+    //生成公共参数
+    int PsiSender::genPublicParamFromNpot(u8 **pubParamBuf, u64 &pubParamBufByteSize)
+    {
+        return this->iknpOteReceiver.genPublicParamFromNpot(pubParamBuf, pubParamBufByteSize);
+    }
+    //接收到pk0s,并生成T异或R 将uBuffOutput发送给对方
+    int PsiSender::genMatrixTxorRBuff(u8 *pk0Buf, const u64 pk0BufSize,
+                                      u8 **uBuffOutput, u64 &uBuffOutputSize)
+    {
+        int fg = this->iknpOteReceiver.getEncKeyFromNpot(pk0Buf, pk0BufSize);
+        if (fg)
+        {
+            return fg;
+        }
+        //这里生成ubuff以及恢复密钥recoverMsgWidthOutput
+        fg = this->iknpOteReceiver.genRecoverMsg(this->choicesWidthInput,
+                                                 this->recoverMsgWidthOutput, this->uBuffOutput);
+        if (fg)
+        {
+            return fg;
+        }
+        *uBuffOutput = (u8 *)this->uBuffOutput.data();
+        uBuffOutputSize = this->uBuffOutput.size() * sizeof(block);
+        return 0;
+    }
+    //
+    int PsiSender::recoverMatrixC(const u8 *recvMatrixADBuff, const u64 recvMatixADBuffSize,
+                                  const vector<block> &senderSet)
+    {
+        auto locationInBytes = (this->logHeight + 7) / 8;    // logHeight==1
+        auto widthBucket1 = sizeof(block) / locationInBytes; // 16/1
+        u64 shift = (1 << this->logHeight) - 1;              //全1
+        ////////////// Initialization //////////////////////
+        PRNG commonPrng(this->commonSeed);
+        block commonKey;
+        AES commonAes;
+        u8 *transLocations[widthBucket1]; // 16个u8*
+        if (this->senderSize != senderSet.size() || recvMatixADBuffSize != this->matrixWidth * this->heightInBytes)
+        {
+            return -111;
+        }
+        for (auto i = 0; i < widthBucket1; ++i)
+        {
+            // 256*1+4，每个元素为u8*，下面语句为创建一个u8*,260个u8
+            transLocations[i] = new u8[this->senderSize * locationInBytes + sizeof(u32)];
+        }
+        // auto tn = senderSize * locationInBytes + sizeof(u32);
+        // cout << "####transLocations中每一列的字节数：" << tn << "\n";
+        // bucket1 = bucket2 = 1 << 8;  // 256
+        block randomLocations[this->bucket1]; // 256个block
+        u8 *matrixC[widthBucket1];            // 16
+        for (auto i = 0; i < widthBucket1; ++i)
+        {
+            matrixC[i] = new u8[this->heightInBytes]; // 32
+        }
+        u8 *transHashInputs[this->matrixWidth]; // width==60，矩阵宽度
+        for (auto i = 0; i < this->matrixWidth; ++i)
+        { // senderSizeInBytes==32
+            transHashInputs[i] = new u8[this->senderSizeInBytes];
+            memset(transHashInputs[i], 0, this->senderSizeInBytes);
+        }
+        /////////// Transform input /////////////////////
+        commonPrng.get((u8 *)&commonKey, sizeof(block));
+        commonAes.setKey(commonKey);
+        block *sendSet = new block[this->senderSize];
+        transformInputByH1(commonAes, this->h1LengthInBytes, senderSet, sendSet);
+        /////////// Transform input end /////////////////
+        /****cycle start***/
+        for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
+        {
+            auto wRight = wLeft + widthBucket1 < this->matrixWidth ? wLeft + widthBucket1 : this->matrixWidth;
+            auto w = wRight - wLeft;
+            //////////// Compute random locations (transposed) ////////////////
+            commonPrng.get((u8 *)&commonKey, sizeof(block));
+            commonAes.setKey(commonKey);
+            for (auto low = 0; low < this->senderSize; low += bucket1)
+            {
+                auto up = low + bucket1 < this->senderSize ? low + bucket1 : this->senderSize;
+                commonAes.ecbEncBlocks(sendSet + low, up - low, randomLocations);
+                for (auto i = 0; i < w; ++i)
+                {
+                    for (auto j = low; j < up; ++j)
+                    {
+                        memcpy(transLocations[i] + j * locationInBytes,
+                               (u8 *)(randomLocations + (j - low)) + i * locationInBytes,
+                               locationInBytes);
+                    }
+                }
+            }
+            //////////////// Extend OTs and compute matrix C ///////////////////
+            // u8 *recvMatrix;
+            // recvMatrix = new u8[heightInBytes];
+            u64 offset1 = wLeft * this->heightInBytes;
+            u64 offset2 = 0;
+            for (auto i = 0; i < w; ++i)
+            {
+                PRNG prng(this->recoverMsgWidthOutput[i + wLeft]);
+                prng.get(matrixC[i], this->heightInBytes);
+                if (this->choicesWidthInput[i + wLeft])
+                {
+                    for (auto j = 0; j < heightInBytes; ++j)
+                    {
+                        matrixC[i][j] ^= (recvMatrixADBuff + offset1 + offset2)[j];
+                    }
+                }
+                offset2 += this->heightInBytes;
+            }
+            ///////////////// Compute hash inputs (transposed) /////////////////////
+            for (auto i = 0; i < w; ++i)
+            {
+                for (auto j = 0; j < senderSize; ++j)
+                {
+                    auto location =
+                        (*(u32 *)(transLocations[i] + j * locationInBytes)) & shift;
+                    transHashInputs[i + wLeft][j >> 3] |=
+                        (u8)((bool)(matrixC[i][location >> 3] & (1 << (location & 7))))
+                        << (j & 7);
+                }
+            }
+        }
+        /****cycle end ****/
+        //**************释放内存*************//
+        for (auto i = 0; i < widthBucket1; ++i)
+        {
+            delete[] transLocations[i];
+            delete[] matrixC[i];
+        }
+        delete[] sendSet;
+    }
+    //计算本方的hash输出并发送给对方
+    int PsiSender::computeHashOutputToReceiverOnce(const u64 low, const u64 up,
+                                                   u8 **sendBuff, u64 &sendBuffSize)
+    {
+        //H2
+        RandomOracle H(this->hash2LengthInBytes);
+        u8 hashOutput[sizeof(block)];
+        for (auto j = low; j < up; ++j)
+        {
+            memset(this->hashInputs[j - low].data(), 0, this->matrixWidthInBytes);
+        }
+        for (auto i = 0; i < this->matrixWidth; ++i)
+        {
+            for (auto j = low; j < up; ++j)
+            {
+                this->hashInputs[j - low][i >> 3] |=
+                    (u8)((bool)(this->transHashInputs[i][j >> 3] & (1 << (j & 7))))
+                    << (i & 7);
+            }
+        }
+        // u8 *sentBuff = new u8[(up - low) * hashLengthInBytes];
+        for (auto j = low; j < up; ++j)
+        {
+            H.Reset();
+            H.Update(this->hashInputs[j - low].data(), this->matrixWidthInBytes);
+            H.Final(hashOutput);
+            memcpy(this->hashOutputBuff.data() + (j - low) * this->hash2LengthInBytes,
+                   hashOutput, this->hash2LengthInBytes);
+        }
+        sendBuffSize = (up - low) * this->hash2LengthInBytes;
+        *sendBuff = this->hashOutputBuff.data();
+        return 0;
+    }
 }
