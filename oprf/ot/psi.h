@@ -15,7 +15,7 @@ namespace osuCrypto
         u64 senderSize;
         u64 senderSizeInBytes;
         u64 bucket1;
-        u64 bucket2;
+        u64 bucket2ForComputeH2Output;
         u64 h1LengthInBytes;
         u64 hash2LengthInBytes;
         BitVector choicesWidthInput;
@@ -30,9 +30,9 @@ namespace osuCrypto
         PsiSender();
         ~PsiSender();
         //初始化psiSender
-        int init(const block &commonSeed, const block &localSeed,
+        int init(block commonSeed, block localSeed,
                  u64 matrixWidth, u64 logHeight, u64 senderSize,
-                 u64 hash2LengthInBytes = 10);
+                 u64 hash2LengthInBytes = 10, u64 bucket2ForComputeH2Output = 256);
         //生成基本ot协议的公共参数，并发送给对方
         int genPublicParamFromNpot(u8 **pubParamBuf, u64 &pubParamBufByteSize);
         //接收对方pk0Buf；并生成T^R的结果uBuffOutput，发送给对方
@@ -42,6 +42,14 @@ namespace osuCrypto
         int recoverMatrixC(const u8 *recvMatrixADBuff, const u64 recvMatixADBuffSize,
                            const vector<block> &senderSet);
         //循环计算hash输出并发送给对方
+        /*
+        for (auto low = 0; low < senderSize; low += bucket2) {
+            auto up = low + bucket2 < senderSize ? low + bucket2 : senderSize;
+            调用：
+            computeHashOutputToReceiverOnce(const u64 low, const u64 up,
+                                            u8 **sendBuff, u64 &sendBuffSize)
+        }
+        */
         int computeHashOutputToReceiverOnce(const u64 low, const u64 up,
                                             u8 **sendBuff, u64 &sendBuffSize);
     };
@@ -58,7 +66,7 @@ namespace osuCrypto
         u64 height;
         u64 heightInBytes;
         u64 bucket1;
-        u64 bucket2;
+        u64 bucket2ForComputeH2Output;
         u64 h1LengthInBytes;
         u64 hash2LengthInBytes;
         vector<array<block, 2>> encMsgOutput; //可能用不着
@@ -72,9 +80,9 @@ namespace osuCrypto
         PsiReceiver();
         ~PsiReceiver();
         //初始化psiReceiver
-        int init(const block &commonSeed, const block &localSeed,
+        int init(block commonSeed, block localSeed,
                  u64 matrixWidth, u64 logHeight, u64 receiverSize,
-                 u64 hash2LengthInBytes = 10);
+                 u64 hash2LengthInBytes = 10, u64 bucket2ForComputeH2Output = 256);
         //接收对方发送过来的公共参数，并根据baseot choices输入生成pk0s,并发送过对方
         int genPK0FromNpot(u8 *pubParamBuf, const u64 pubParamBufByteSize,
                            u8 **pk0Buf, u64 &pk0BufSize);

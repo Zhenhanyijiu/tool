@@ -20,7 +20,7 @@ BOOST_ROOT=../libOTe/cryptoTools/thirdparty/linux/boost
 #crytoTools 源码编译，将miracl源码一起编译，不链接静态库
 #g++ -I./include -m64 -O2 -Wall -fPIC -shared -o mir-nom64 source/*.c
 if [ -f "test_np" ];then
-    rm -rf test_np
+    rm -rf test_psi
 fi
 if [ $? -ne 0 ]; then
     echo "===failed"
@@ -28,7 +28,7 @@ else
     echo "===succeed"
 fi
 BLAKE2_DIR=../libOTe/cryptoTools/cryptoTools/Crypto/blake2
-g++ -Wall -O2 -msse3 -msse2 -msse4.1 -maes -DENABLE_MIRACL=ON \
+g++ -g -Wall -O2 -msse3 -msse2 -msse4.1 -maes -DENABLE_MIRACL=ON \
 -DENABLE_CIRCUITS=OFF -DENABLE_CPP_14=ON -DENABLE_FULL_GSL=ON \
 -I${CRYPTO_INCLUDE} -I${THIRD_INCLUDE}/miracl \
 -I${THIRD_INCLUDE}/miracl/miracl/include \
@@ -40,7 +40,7 @@ ${BLAKE2_DIR}/*c \
 ${CRYPTO_INCLUDE}/cryptoTools/Crypto/*.cpp \
 ./ot/*cpp \
 -lpthread \
-test_np.cpp -o test_np
+test_psi.cpp -o test_psi
 ###################
 # g++ -Wall -O2 -msse3 -msse2 -msse4.1 -maes -DENABLE_MIRACL=ON \
 # -DENABLE_CIRCUITS=OFF -DENABLE_CPP_14=ON -DENABLE_FULL_GSL=ON \

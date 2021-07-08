@@ -87,7 +87,7 @@ void *initChannel(PartType pltype, const char *address, int port)
         stRemoteAddr.sin_addr.s_addr = inet_addr(address);
 
         //连接方法： 传入句柄，目标地址，和大小
-        Timeout *t = new_timiout(10);
+        Timeout *t = new_timiout(300);
         while (1)
         {
             int fg = connect(socket_fd, (struct sockaddr *)&stRemoteAddr, sizeof(stRemoteAddr));
@@ -193,7 +193,7 @@ void *initChannel(PartType pltype, const char *address, int port)
             close(socket_fd);
             return nullptr;
         }
-        ch->recv_buff = (char *)malloc(1024 * 1024 * 100); //100M
+        ch->recv_buff = (char *)malloc(RECV_BUFF_SIZE); //100M
         if (ch->recv_buff == NULL)
         {
             free(ch);
@@ -201,7 +201,7 @@ void *initChannel(PartType pltype, const char *address, int port)
             close(socket_fd);
             return nullptr;
         }
-        ch->recv_buff_len = 1024 * 1024 * 100;
+        ch->recv_buff_len = RECV_BUFF_SIZE;
         ch->socket_fd = -1;
         ch->conn = -1;
         printf("accept ok...\n");
@@ -227,6 +227,7 @@ int freeChannel(void *ch)
             close(c->socket_fd);
         }
         free(c->recv_buff);
+        c->recv_buff = nullptr;
         free(ch);
         ch = NULL;
     }
@@ -251,9 +252,30 @@ int send_data(void *channel, const char *buff, int buf_size)
     assert(n == 4);
     if (n != 4)
     {
+        printf("send header error,n(%d)\n", n);
         return -121;
     }
-    n = send(chan->conn, buff, buf_size, 0);
+    int offset = 0;
+    int remain_len = buf_size;
+    while (1)
+    {
+        n = send(chan->conn, buff + offset, remain_len, 0);
+        if (n < 0)
+        {
+            return -111;
+        }
+        offset += n;
+        if (offset < buf_size)
+        {
+            remain_len = buf_size - offset;
+            continue;
+        }
+        else
+        {
+            break;
+        }
+    }
+    // n = send(chan->conn, buff, buf_size, 0);
     assert(n == buf_size);
     return n;
 }
@@ -269,7 +291,7 @@ int recv_data(void *channel, char **buff_output)
     int n = recv(chan->conn, (char *)&headlen, 4, 0);
     if (n != 4)
     {
-        printf("error...2\n");
+        printf("error...2。n(%d)\n", n);
         return -110;
     }
     //空间不够
