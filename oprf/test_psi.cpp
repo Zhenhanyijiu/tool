@@ -149,6 +149,7 @@ int main(int argc, char **argv)
     int hash2LengthInBytes = 10;
     // int bucket2ForComputeH2Output = atoi(argv[7]);
     int bucket2ForComputeH2Output = 256;
+    bucket2ForComputeH2Output = 512;
     char address[] = "127.0.0.1";
     int port = 7878;
     if (!cmd.isSet("r"))
@@ -194,6 +195,7 @@ int main(int argc, char **argv)
         void *client = initChannel(CLIENT, address, port);
         assert(client);
         //psi 发送方
+        startTime(timeCompute);
         int fg = psiSender.init(commonSeed, localSeed, matrixWidth, logHeight, senderSize,
                                 hash2LengthInBytes, bucket2ForComputeH2Output);
         assert(fg == 0);
@@ -222,7 +224,20 @@ int main(int argc, char **argv)
         // assert(matrixAxorD);
         fg = psiSender.recoverMatrixC((oc::u8 *)matrixAxorD, n, sendSet);
         assert(fg == 0);
-        
+        //循环发送hash输出给对方
+        char *hashOutputOnceBuff = nullptr;
+        oc::u64 hashOutputOnceBuffSize = 0;
+        int totalCyc = senderSize / bucket2ForComputeH2Output;
+        for (auto low = 0; low < senderSize; low += bucket2ForComputeH2Output)
+        {
+            auto up = low + bucket2ForComputeH2Output < senderSize ? low + bucket2ForComputeH2Output : senderSize;
+            fg = psiSender.computeHashOutputToReceiverOnce(low, up, (oc::u8 **)&hashOutputOnceBuff, hashOutputOnceBuffSize);
+            assert(fg == 0);
+            n = send_data(client, hashOutputOnceBuff, hashOutputOnceBuffSize);
+            assert(n == hashOutputOnceBuffSize);
+        }
+        useTime = getEndTime(timeCompute);
+        printf("发送方用时：%dms,totalCyc:%d\n", useTime, totalCyc);
         printf("----------->>>>>>main over \n");
         // //释放mem, sender
         freeTimeCompute(timeCompute);
@@ -247,6 +262,7 @@ int main(int argc, char **argv)
         //初始化一个socket连接
         void *server = initChannel(SERVER, address, port);
         assert(server);
+        startTime(timeCompute);
         //初始化psiRecv
         int fg = psiRecv.init(commonSeed, localSeed, matrixWidth, logHeight,
                               receiverSize, hash2LengthInBytes, bucket2ForComputeH2Output);
@@ -273,6 +289,27 @@ int main(int argc, char **argv)
         //本方生成hashMap
         fg = psiRecv.genenateAllHashesMap();
         assert(fg == 0);
+        //循环接收对方发来的hashOutput
+        char *hashOutput = nullptr;
+        vector<int> psiMsgIndexs;
+        int totalCyc = senderSize / bucket2ForComputeH2Output;
+        for (auto low = 0; low < senderSize; low += bucket2ForComputeH2Output)
+        {
+            auto up = low + bucket2ForComputeH2Output < senderSize ? low + bucket2ForComputeH2Output : senderSize;
+            n = recv_data(server, &hashOutput);
+            assert(n > 0);
+            fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput,
+                                                         n, low, up, psiMsgIndexs);
+            // printf("fg=>%d\n", fg);
+            assert(fg == 0);
+        }
+        useTime = getEndTime(timeCompute);
+        printf("接收方用时：%dms,totalCyc:%d\n", useTime, totalCyc);
+        // for (int i = 0; i < psiMsgIndexs.size(); i++)
+        // {
+        //     cout << "i:" << i << "," << recvSet[i] << endl;
+        // }
+        printf("psi count:%d\n", psiMsgIndexs.size());
 
         // //释放mem
         freeTimeCompute(timeCompute);

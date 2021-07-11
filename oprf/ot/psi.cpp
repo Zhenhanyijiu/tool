@@ -270,7 +270,7 @@ namespace osuCrypto
                                                      const u64 low, const u64 up,
                                                      vector<int> &psiMsgIndex)
     {
-        if (recvBufSize != (up - low) * this->heightInBytes)
+        if (recvBufSize != (up - low) * this->hash2LengthInBytes)
         {
             return -122;
         }
@@ -462,7 +462,7 @@ namespace osuCrypto
         {
             delete[] transLocations[i];
             delete[] matrixC[i];
-            printf(">>>>>>>>>i:%d,widthBucket1:%d\n", i, widthBucket1);
+            // printf(">>>>>>>>>i:%d,widthBucket1:%d\n", i, widthBucket1);
         }
         delete[] sendSet;
         printf(">>>>>>>>>> sendSet,end\n");
