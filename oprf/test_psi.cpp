@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <sys/time.h>
+#define Psi_Size 5000
 namespace oc = osuCrypto;
 
 using namespace std;
@@ -42,7 +43,7 @@ int getEndTime(void *tc)
     gettimeofday(&(t->end), NULL);
     int time_use = (t->end.tv_sec - t->start.tv_sec) * 1000000 +
                    (t->end.tv_usec - t->start.tv_usec);
-    return time_use / 1000.0;
+    return time_use / 1000;
 }
 void freeTimeCompute(void *tc)
 {
@@ -95,21 +96,22 @@ void check_recover(const vector<array<oc::block, 2>> &otMsg,
 
 //psi test use socket
 #if 1
-void generateDataSet(const int ptype, const oc::u64 dataSize, vector<oc::block> &dataSet)
+oc::u64 seed;
+void generateDataSet(const int ptype, const oc::u64 dataSize, oc::u64 seed, vector<oc::block> &dataSet)
 {
-    oc::PRNG prng(oc::toBlock(0x77887788));
+    oc::PRNG prng(oc::toBlock(0x77887788 + seed));
     //sender
-    oc::u64 psiSize = 100;
+    oc::u64 psiSize = Psi_Size;
     dataSet.resize(dataSize);
     assert(dataSize >= psiSize);
     if (ptype == 0)
     {
         oc::u64 i = 0;
-        for (; i < 100; i++)
+        for (; i < psiSize; i++)
         {
             dataSet[i] = prng.get<oc::block>();
         }
-        prng.SetSeed(oc::toBlock(0x998877));
+        prng.SetSeed(oc::toBlock(0x998877 + seed));
         for (; i < dataSize; i++)
         {
             dataSet[i] = prng.get<oc::block>();
@@ -145,6 +147,10 @@ int main(int argc, char **argv)
     cmd.setDefault("rs", 5000000);
     int receiverSize = cmd.get<oc::u64>("rs");
     printf("rs:%d\n", receiverSize);
+    //命令行传种子
+    cmd.setDefault("sd", 0);
+    seed = cmd.get<oc::u64>("sd");
+    printf("sd:%d\n", seed);
     // int hash2LengthInBytes = atoi(argv[6]);
     int hash2LengthInBytes = 10;
     // int bucket2ForComputeH2Output = atoi(argv[7]);
@@ -176,7 +182,7 @@ int main(int argc, char **argv)
     }
     int ptype = cmd.get<oc::u64>("r");
     printf("r:%d\n", ptype);
-    oc::block commonSeed = oc::toBlock(0x333333);
+    oc::block commonSeed = oc::toBlock(0x333333 + seed);
     if (ptype == CLIENT)
     {
         //生成sendSet
@@ -184,13 +190,13 @@ int main(int argc, char **argv)
         assert(timeCompute);
         startTime(timeCompute);
         vector<oc::block> sendSet;
-        generateDataSet(0, senderSize, sendSet);
+        generateDataSet(0, senderSize, seed, sendSet);
         int useTime = getEndTime(timeCompute);
         printf("生成发送者数据集:%dms\n", useTime);
         //生成sendSet end
         //printOTMsgSingle(sendSet);
         oc::PsiSender psiSender;
-        oc::block localSeed = oc::toBlock(0x111111);
+        oc::block localSeed = oc::toBlock(0x111111 + seed);
         //初始化一个socket连接
         void *client = initChannel(CLIENT, address, port);
         assert(client);
@@ -252,13 +258,13 @@ int main(int argc, char **argv)
         assert(timeCompute);
         startTime(timeCompute);
         vector<oc::block> recvSet;
-        generateDataSet(1, receiverSize, recvSet);
+        generateDataSet(1, receiverSize, seed, recvSet);
         int useTime = getEndTime(timeCompute);
         printf("生成接收者数据集:%dms\n", useTime);
         //生成recvSet end
         //printOTMsgSingle(recvSet);
         oc::PsiReceiver psiRecv;
-        oc::block localSeed = oc::toBlock(0x222222);
+        oc::block localSeed = oc::toBlock(0x222222 + seed);
         //初始化一个socket连接
         void *server = initChannel(SERVER, address, port);
         assert(server);
@@ -287,8 +293,14 @@ int main(int argc, char **argv)
         assert(fg == 0);
         n = send_data(server, matrixADBuff, matrixADBuffSize);
         //本方生成hashMap
+        void *timeHashMapNeed = newTimeCompute();
+        assert(timeHashMapNeed);
+        startTime(timeHashMapNeed);
         fg = psiRecv.genenateAllHashesMap();
         assert(fg == 0);
+        int time1 = getEndTime(timeHashMapNeed);
+        freeTimeCompute(timeHashMapNeed);
+        printf("生成hashMap表所需时间:%dms\n", time1);
         //循环接收对方发来的hashOutput
         char *hashOutput = nullptr;
         vector<int> psiMsgIndexs;
@@ -310,7 +322,7 @@ int main(int argc, char **argv)
         //     cout << "i:" << i << "," << recvSet[i] << endl;
         // }
         printf("psi count:%d\n", psiMsgIndexs.size());
-
+        assert(psiMsgIndexs.size() == Psi_Size);
         // //释放mem
         freeTimeCompute(timeCompute);
         freeChannel(server);
