@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <fstream>
 #define Psi_Size 5000
 namespace oc = osuCrypto;
 
@@ -97,7 +98,8 @@ void check_recover(const vector<array<oc::block, 2>> &otMsg,
 //psi test use socket
 #if 1
 oc::u64 seed;
-void generateDataSet(const int ptype, const oc::u64 dataSize, oc::u64 seed, vector<oc::block> &dataSet)
+void generateDataSet(const int ptype, const oc::u64 dataSize,
+                     oc::u64 seed, vector<vector<oc::u8>> &dataSet)
 {
     oc::PRNG prng(oc::toBlock(0x77887788 + seed));
     //sender
@@ -109,12 +111,15 @@ void generateDataSet(const int ptype, const oc::u64 dataSize, oc::u64 seed, vect
         oc::u64 i = 0;
         for (; i < psiSize; i++)
         {
-            dataSet[i] = prng.get<oc::block>();
+            dataSet[i].resize(16);
+            prng.get(dataSet[i].data(), 16);
         }
         prng.SetSeed(oc::toBlock(0x998877 + seed));
         for (; i < dataSize; i++)
         {
-            dataSet[i] = prng.get<oc::block>();
+            dataSet[i].resize(16);
+            // dataSet[i] = prng.get<oc::block>();
+            prng.get(dataSet[i].data(), 16);
         }
     }
     //receiver
@@ -122,9 +127,37 @@ void generateDataSet(const int ptype, const oc::u64 dataSize, oc::u64 seed, vect
     {
         for (oc::u64 i = 0; i < dataSet.size(); i++)
         {
-            dataSet[i] = prng.get<oc::block>();
+            dataSet[i].resize(16);
+            // dataSet[i] = prng.get<oc::block>();
+            prng.get(dataSet[i].data(), 16);
         }
     }
+}
+void generateDataSetByFile(const string path, oc::u64 dataSetSize,
+                           vector<vector<oc::u8>> &dataSet)
+{
+    ifstream fin;
+    // fin.open("../../id.txt", ios::in);
+    fin.open(path, ios::in);
+    assert(fin.is_open());
+    dataSet.resize(dataSetSize);
+    for (int i = 0; i < dataSetSize; i++)
+    {
+        dataSet[i].resize(18);
+        memset((char *)(dataSet[i].data()), 0, 18);
+        fin.read((char *)(dataSet[i].data()), 18);
+        if (fin.gcount() != 18)
+        {
+            break;
+        }
+        // assert(fin.gcount() != 18);
+        fin.seekg(1, ios::cur);
+    }
+    char stmp[19];
+    memset(stmp, 0, 19);
+    memcpy(stmp, (char *)(dataSet[dataSetSize - 1].data()), 18);
+    printf("最后一个数据:%s\n", stmp);
+    fin.close();
 }
 int main(int argc, char **argv)
 {
@@ -151,6 +184,10 @@ int main(int argc, char **argv)
     cmd.setDefault("sd", 0);
     seed = cmd.get<oc::u64>("sd");
     printf("sd:%d\n", seed);
+    //数据文件路径
+    cmd.setDefault("path", "");
+    string path = cmd.get<string>("path");
+    printf("path:%s\n", path.c_str());
     // int hash2LengthInBytes = atoi(argv[6]);
     int hash2LengthInBytes = 10;
     // int bucket2ForComputeH2Output = atoi(argv[7]);
@@ -189,8 +226,15 @@ int main(int argc, char **argv)
         void *timeCompute = newTimeCompute();
         assert(timeCompute);
         startTime(timeCompute);
-        vector<oc::block> sendSet;
-        generateDataSet(0, senderSize, seed, sendSet);
+        vector<vector<oc::u8>> sendSet;
+        if (path == "")
+        {
+            generateDataSet(0, senderSize, seed, sendSet);
+        }
+        else
+        {
+            generateDataSetByFile(path, senderSize, sendSet);
+        }
         int useTime = getEndTime(timeCompute);
         printf("生成发送者数据集:%dms\n", useTime);
         //生成sendSet end
@@ -257,8 +301,16 @@ int main(int argc, char **argv)
         void *timeCompute = newTimeCompute();
         assert(timeCompute);
         startTime(timeCompute);
-        vector<oc::block> recvSet;
-        generateDataSet(1, receiverSize, seed, recvSet);
+        vector<vector<oc::u8>> recvSet;
+        // generateDataSet(1, receiverSize, seed, recvSet);
+        if (path == "")
+        {
+            generateDataSet(0, receiverSize, seed, recvSet);
+        }
+        else
+        {
+            generateDataSetByFile(path, receiverSize, recvSet);
+        }
         int useTime = getEndTime(timeCompute);
         printf("生成接收者数据集:%dms\n", useTime);
         //生成recvSet end
@@ -322,7 +374,7 @@ int main(int argc, char **argv)
         //     cout << "i:" << i << "," << recvSet[i] << endl;
         // }
         printf("psi count:%d\n", psiMsgIndexs.size());
-        assert(psiMsgIndexs.size() == Psi_Size);
+        // assert(psiMsgIndexs.size() == Psi_Size);
         // //释放mem
         freeTimeCompute(timeCompute);
         freeChannel(server);

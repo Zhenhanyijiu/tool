@@ -1,1 +1,1 @@
-./test_psi -r 0 -w 60 -h 10 -ss 30000000 -rs 30000000 -sd 2
+./test_psi -r 0 -w 60 -h 10 -ss 5000000 -rs 5000000 -sd 22 -path ../../500w_1.txt

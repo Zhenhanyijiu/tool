@@ -5,7 +5,7 @@ namespace osuCrypto
     //common function
     //将所有输入的数据以相同的方式H1做映射，以dataSetOutput返回
     void transformInputByH1(const AES &commonAes, const u64 h1LengthInBytes,
-                            const vector<block> &dataSetInput,
+                            const vector<vector<u8>> &dataSetInput,
                             block *&dataSetOutput)
     {
         u64 dataSetInputSize = dataSetInput.size();
@@ -18,7 +18,7 @@ namespace osuCrypto
             // 256个元素
             H1.Reset();
             //对每一个y属于dataSetInput，映射成一个hash值，32字节（H1,H2）
-            H1.Update((u8 *)(dataSetInput.data() + i), sizeof(block));
+            H1.Update(dataSetInput[i].data(), dataSetInput[i].size());
             H1.Final(h1Output);
             // H1
             aesInput[i] = *(block *)h1Output; //前16字节，后16字节
@@ -74,7 +74,7 @@ namespace osuCrypto
                                                   pk0Buf, pk0BufSize);
     }
     int PsiReceiver::getSendMatrixADBuff(const u8 *uBuffInput, const int uBuffInputSize,
-                                         const vector<block> &receiverSet,
+                                         const vector<vector<u8>> &receiverSet,
                                          u8 **sendMatrixADBuff, u64 &sendMatixADBuffSize)
     {
         int ublocksize = uBuffInputSize / sizeof(block);
@@ -360,7 +360,7 @@ namespace osuCrypto
     }
     //
     int PsiSender::recoverMatrixC(const u8 *recvMatrixADBuff, const u64 recvMatixADBuffSize,
-                                  const vector<block> &senderSet)
+                                  const vector<vector<u8>> &senderSet)
     {
         auto locationInBytes = (this->logHeight + 7) / 8;    // logHeight==1
         auto widthBucket1 = sizeof(block) / locationInBytes; // 16/1

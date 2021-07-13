@@ -40,7 +40,7 @@ namespace osuCrypto
                                u8 **uBuffOutput, u64 &uBuffOutputSize);
         //接收recvMatrixADBuff，恢复出矩阵C
         int recoverMatrixC(const u8 *recvMatrixADBuff, const u64 recvMatixADBuffSize,
-                           const vector<block> &senderSet);
+                           const vector<vector<u8>> &senderSet);
         //循环计算hash输出并发送给对方
         /*
         for (auto low = 0; low < senderSize; low += bucket2) {
@@ -89,7 +89,7 @@ namespace osuCrypto
         //uBuffInput对方发送过来的，作为输入，encMsgOutput为输出，大小在外部初始化
         // int getEncMsg(const vector<block> &uBuffInput, vector<array<block, 2>> &encMsgOutput);
         int getSendMatrixADBuff(const u8 *uBuffInput, const int uBuffInputSize,
-                                const vector<block> &receiverSet,
+                                const vector<vector<u8>> &receiverSet,
                                 u8 **sendMatrixADBuff, u64 &sendMatixADBuffSize);
         //将sendMatrixADBuff发送给对方之后，接下来生成AllHashMap
         int genenateAllHashesMap();
