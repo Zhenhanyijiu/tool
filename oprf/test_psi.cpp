@@ -17,7 +17,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <fstream>
-#define Psi_Size 5000
+#define Psi_Size 2000000
 namespace oc = osuCrypto;
 
 using namespace std;
@@ -133,32 +133,61 @@ void generateDataSet(const int ptype, const oc::u64 dataSize,
         }
     }
 }
-void generateDataSetByFile(const string path, oc::u64 dataSetSize,
-                           vector<vector<oc::u8>> &dataSet)
+// void generateDataSetByFile(const string path, oc::u64 dataSetSize,
+//                            vector<vector<oc::u8>> &dataSet)
+// {
+//     ifstream fin;
+//     // fin.open("../../id.txt", ios::in);
+//     fin.open(path, ios::in);
+//     assert(fin.is_open());
+//     dataSet.resize(dataSetSize);
+//     for (int i = 0; i < dataSetSize; i++)
+//     {
+//         dataSet[i].resize(18);
+//         memset((char *)(dataSet[i].data()), 0, 18);
+//         fin.read((char *)(dataSet[i].data()), 18);
+//         if (fin.gcount() != 18)
+//         {
+//             break;
+//         }
+//         // assert(fin.gcount() != 18);
+//         fin.seekg(1, ios::cur);
+//     }
+//     char stmp[19];
+//     memset(stmp, 0, 19);
+//     memcpy(stmp, (char *)(dataSet[dataSetSize - 1].data()), 18);
+//     printf("最后一个数据:%s\n", stmp);
+//     fin.close();
+// }
+char *readFileAllByCPP(const char *fileName, long int *sizeOut)
 {
-    ifstream fin;
-    // fin.open("../../id.txt", ios::in);
-    fin.open(path, ios::in);
-    assert(fin.is_open());
-    dataSet.resize(dataSetSize);
-    for (int i = 0; i < dataSetSize; i++)
+    // filebuf *pbuf;
+    ifstream filestr;
+    // char *buffer;
+    // 要读入整个文件，必须采用二进制打开
+    filestr.open(fileName, ios::binary);
+    // 获取filestr对应buffer对象的指针
+    filebuf *pbuf = filestr.rdbuf();
+    // 调用buffer对象方法获取文件大小
+    long size = pbuf->pubseekoff(0, ios::end, ios::in);
+    pbuf->pubseekpos(0, ios::in);
+    // 分配内存空间
+    /* 分配内存存储整个文件 */
+    char *buffer = (char *)malloc(sizeof(char) * size);
+    if (buffer == NULL)
     {
-        dataSet[i].resize(18);
-        memset((char *)(dataSet[i].data()), 0, 18);
-        fin.read((char *)(dataSet[i].data()), 18);
-        if (fin.gcount() != 18)
-        {
-            break;
-        }
-        // assert(fin.gcount() != 18);
-        fin.seekg(1, ios::cur);
+        return NULL;
     }
-    char stmp[19];
-    memset(stmp, 0, 19);
-    memcpy(stmp, (char *)(dataSet[dataSetSize - 1].data()), 18);
-    printf("最后一个数据:%s\n", stmp);
-    fin.close();
+    // 获取文件内容
+    long n = pbuf->sgetn(buffer, size);
+    assert(n == size);
+    *sizeOut = size;
+    filestr.close();
+    // 输出到标准输出
+    // cout.write(buffer, size);
+    return buffer;
 }
+
 int main(int argc, char **argv)
 {
     // int ptype = atoi(argv[1]); //0 send;1 recv
@@ -193,8 +222,14 @@ int main(int argc, char **argv)
     // int bucket2ForComputeH2Output = atoi(argv[7]);
     int bucket2ForComputeH2Output = 256;
     bucket2ForComputeH2Output = 512;
-    char address[] = "127.0.0.1";
-    int port = 7878;
+    //ip地址
+    cmd.setDefault("ip", "127.0.0.1");
+    string address = cmd.get<string>("ip");
+    printf("ip:%s\n", address.c_str());
+    //port端口
+    cmd.setDefault("port", 7878);
+    int port = cmd.get<oc::u64>("port");
+    printf("port:%d\n", port);
     if (!cmd.isSet("r"))
     {
         std::cout << "=================================\n"
@@ -227,13 +262,30 @@ int main(int argc, char **argv)
         assert(timeCompute);
         startTime(timeCompute);
         vector<vector<oc::u8>> sendSet;
+        sendSet.resize(senderSize);
         if (path == "")
         {
             generateDataSet(0, senderSize, seed, sendSet);
         }
         else
         {
-            generateDataSetByFile(path, senderSize, sendSet);
+            long filesize = 0;
+            char *bufread = readFileAllByCPP(path.c_str(), &filesize);
+            // generateDataSetByFile(path, senderSize, sendSet);
+            assert(bufread);
+            char *left = bufread;
+            char *end = bufread + filesize;
+            int i = 0;
+            for (; left < end; left += 19, i++)
+            {
+                if (i < senderSize)
+                {
+                    sendSet[i].resize(18);
+                    memcpy((char *)(sendSet[i].data()), left, 18);
+                }
+            }
+            printf("===>>i:%d\n", i);
+            assert(i == senderSize);
         }
         int useTime = getEndTime(timeCompute);
         printf("生成发送者数据集:%dms\n", useTime);
@@ -242,7 +294,7 @@ int main(int argc, char **argv)
         oc::PsiSender psiSender;
         oc::block localSeed = oc::toBlock(0x111111 + seed);
         //初始化一个socket连接
-        void *client = initChannel(CLIENT, address, port);
+        void *client = initChannel(CLIENT, address.c_str(), port);
         assert(client);
         //psi 发送方
         startTime(timeCompute);
@@ -302,14 +354,31 @@ int main(int argc, char **argv)
         assert(timeCompute);
         startTime(timeCompute);
         vector<vector<oc::u8>> recvSet;
+        recvSet.resize(receiverSize);
         // generateDataSet(1, receiverSize, seed, recvSet);
         if (path == "")
         {
-            generateDataSet(0, receiverSize, seed, recvSet);
+            generateDataSet(1, receiverSize, seed, recvSet);
         }
         else
         {
-            generateDataSetByFile(path, receiverSize, recvSet);
+            // generateDataSetByFile(path, receiverSize, recvSet);
+            long filesize = 0;
+            char *bufread = readFileAllByCPP(path.c_str(), &filesize);
+            assert(bufread);
+            char *left = bufread;
+            char *end = bufread + filesize;
+            int i = 0;
+            for (; left < end; left += 19, i++)
+            {
+                if (i < receiverSize)
+                {
+                    recvSet[i].resize(18);
+                    memcpy((char *)(recvSet[i].data()), left, 18);
+                }
+            }
+            printf("===>>i:%d\n", i);
+            assert(i == receiverSize);
         }
         int useTime = getEndTime(timeCompute);
         printf("生成接收者数据集:%dms\n", useTime);
@@ -318,7 +387,7 @@ int main(int argc, char **argv)
         oc::PsiReceiver psiRecv;
         oc::block localSeed = oc::toBlock(0x222222 + seed);
         //初始化一个socket连接
-        void *server = initChannel(SERVER, address, port);
+        void *server = initChannel(SERVER, address.c_str(), port);
         assert(server);
         startTime(timeCompute);
         //初始化psiRecv

@@ -457,7 +457,21 @@ int main()
     startTime(timeC);
     buf = readFileAllByCPP("../../500w_1.txt", &size);
     useTime = getEndTime(timeC);
-    printf("===use time:%dms\n", useTime);
+    printf("===readFileAllByCPP use time:%dms,size:%ld\n", useTime, size);
+    //memcpy
+    char perid[18];
+    char *left = buf;
+    char *end = buf + size;
+    startTime(timeC);
+    int i = 0;
+    for (; left < end; left += 19)
+    {
+        memcpy(perid, left, 18);
+        i++;
+    }
+    useTime = getEndTime(timeC);
+    printf("===memcpy use time:%dms,size:%ld,count:%d\n", useTime, size, i);
+
     free(buf);
 
     return 0;
