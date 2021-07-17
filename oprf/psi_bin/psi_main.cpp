@@ -248,8 +248,10 @@ int main(int argc, char **argv)
                   << " -rs     log(#elements) on receiver side.\n"
                   << " -w      width of the matrix.\n"
                   << " -h      log(height) of the matrix.\n"
-                  << " -hash   hash output length in bytes.\n"
-                  << " -ip     ip address (and port).\n";
+                  << " -sd     common seed (optional).\n"
+                  << " -path   return data from file-path.\n"
+                  << " -ip     ip address .\n"
+                  << " -port   port.\n";
         return 0;
     }
     int ptype = cmd.get<oc::u64>("r");

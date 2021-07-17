@@ -1,7 +1,7 @@
 set -e
-CRYPTO_INCLUDE=../libOTe/cryptoTools
-THIRD_INCLUDE=../libOTe/cryptoTools/thirdparty/linux
-BOOST_ROOT=../libOTe/cryptoTools/thirdparty/linux/boost
+CRYPTO_INCLUDE=../../libOTe/cryptoTools
+THIRD_INCLUDE=../../libOTe/cryptoTools/thirdparty/linux
+#BOOST_ROOT=../libOTe/cryptoTools/thirdparty/linux/boost
 #${CRYPTO_INCLUDE}/cryptoTools/Common/*.cpp
 #-mfma
 #-DENABLE_NASM=OFF
@@ -27,20 +27,20 @@ if [ $? -ne 0 ]; then
 else
     echo "===succeed"
 fi
-BLAKE2_DIR=../libOTe/cryptoTools/cryptoTools/Crypto/blake2
+BLAKE2_DIR=../../libOTe/cryptoTools/cryptoTools/Crypto/blake2
 g++ -g -Wall -O2 -msse3 -msse2 -msse4.1 -maes -DENABLE_MIRACL=ON \
 -DENABLE_CIRCUITS=OFF -DENABLE_CPP_14=ON -DENABLE_FULL_GSL=ON \
 -I${CRYPTO_INCLUDE} -I${THIRD_INCLUDE}/miracl \
 -I${THIRD_INCLUDE}/miracl/miracl/include \
 -I${BLAKE2_DIR} \
--I./ot \
+-I../ot \
 ${THIRD_INCLUDE}/miracl/miracl/source/*.c \
 ${CRYPTO_INCLUDE}/cryptoTools/Common/*.cpp \
 ${BLAKE2_DIR}/*c \
 ${CRYPTO_INCLUDE}/cryptoTools/Crypto/*.cpp \
-./ot/*cpp \
+../ot/*cpp \
 -lpthread \
-test_psi.cpp -o test_psi
+psi_main.cpp -o psi
 ###################
 # g++ -Wall -O2 -msse3 -msse2 -msse4.1 -maes -DENABLE_MIRACL=ON \
 # -DENABLE_CIRCUITS=OFF -DENABLE_CPP_14=ON -DENABLE_FULL_GSL=ON \
