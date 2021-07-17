@@ -443,19 +443,31 @@ char *readFileAllByCPP(const char *fileName, long int *sizeOut)
     return buffer;
 }
 
+void writeFileAllByCPP(const char *fileName, const char *buf, long int bufSize)
+{
+    // 文件输出流;
+    ofstream out;
+    // 要写入整个文件，必须采用二进制打开
+    out.open(fileName, ios::binary);
+    assert(out);
+    out.write(buf, bufSize);
+
+    out.close();
+}
+
 #if 1
 int main()
 {
     long int size = 0;
     void *timeC = newTimeCompute();
     startTime(timeC);
-    char *buf = readFileAllByC("../../500w_1.txt", &size);
+    char *buf = readFileAllByC("../../../500w_1.txt", &size);
     int useTime = getEndTime(timeC);
     printf("===use time:%dms\n", useTime);
     free(buf);
     //cpp
     startTime(timeC);
-    buf = readFileAllByCPP("../../500w_1.txt", &size);
+    buf = readFileAllByCPP("../../../500w_1.txt", &size);
     useTime = getEndTime(timeC);
     printf("===readFileAllByCPP use time:%dms,size:%ld\n", useTime, size);
     //memcpy
@@ -472,6 +484,11 @@ int main()
     useTime = getEndTime(timeC);
     printf("===memcpy use time:%dms,size:%ld,count:%d\n", useTime, size, i);
 
+    printf("===>>写文件。。。\n");
+    startTime(timeC);
+    writeFileAllByCPP("../../../500w_1_w.txt", buf, size);
+    useTime = getEndTime(timeC);
+    printf("===writefile use time:%dms\n", useTime);
     free(buf);
 
     return 0;

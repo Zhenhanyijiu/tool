@@ -103,6 +103,6 @@ namespace osuCrypto
         }
         */
         int recvFromSenderAndComputePSIOnce(const u8 *recvBuff, const u64 recvBufSize,
-                                            const u64 low, const u64 up, vector<int> &psiMsgIndex);
+                                            const u64 low, const u64 up, vector<u32> &psiMsgIndex);
     };
 }

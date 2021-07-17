@@ -46,7 +46,7 @@ int getEndTime(void *tc)
                    (t->end.tv_usec - t->start.tv_usec);
     return time_use / 1000;
 }
-void freeTimeCompute(void *tc)
+void releaseTimeCompute(void *tc)
 {
     if (tc)
     {
@@ -133,33 +133,19 @@ void generateDataSet(const int ptype, const oc::u64 dataSize,
         }
     }
 }
-// void generateDataSetByFile(const string path, oc::u64 dataSetSize,
-//                            vector<vector<oc::u8>> &dataSet)
-// {
-//     ifstream fin;
-//     // fin.open("../../id.txt", ios::in);
-//     fin.open(path, ios::in);
-//     assert(fin.is_open());
-//     dataSet.resize(dataSetSize);
-//     for (int i = 0; i < dataSetSize; i++)
-//     {
-//         dataSet[i].resize(18);
-//         memset((char *)(dataSet[i].data()), 0, 18);
-//         fin.read((char *)(dataSet[i].data()), 18);
-//         if (fin.gcount() != 18)
-//         {
-//             break;
-//         }
-//         // assert(fin.gcount() != 18);
-//         fin.seekg(1, ios::cur);
-//     }
-//     char stmp[19];
-//     memset(stmp, 0, 19);
-//     memcpy(stmp, (char *)(dataSet[dataSetSize - 1].data()), 18);
-//     printf("最后一个数据:%s\n", stmp);
-//     fin.close();
-// }
-char *readFileAllByCPP(const char *fileName, long int *sizeOut)
+//write file
+void writeFileAllByCPP(const char *fileName, const char *buf, long bufSize)
+{
+    // 文件输出流;
+    ofstream out;
+    // 要写入整个文件，必须采用二进制打开
+    out.open(fileName, ios::binary);
+    assert(out);
+    out.write(buf, bufSize);
+    out.close();
+}
+//read file
+char *readFileAllByCPP(const char *fileName, long *sizeOut)
 {
     // filebuf *pbuf;
     ifstream filestr;
@@ -183,11 +169,56 @@ char *readFileAllByCPP(const char *fileName, long int *sizeOut)
     assert(n == size);
     *sizeOut = size;
     filestr.close();
-    // 输出到标准输出
-    // cout.write(buffer, size);
     return buffer;
 }
-
+//get psi data and save to file
+void savePsiToFile(const char *fileName, const vector<oc::u32> &psiMsgIndexs,
+                   const vector<vector<oc::u8>> &recvSet)
+{
+    int psiSize = psiMsgIndexs.size();
+    assert(recvSet.size() > 0);
+    int ids = recvSet[0].size();
+    long bufSize = psiSize * ids + psiSize; //空格也要加上
+    printf("===>>ids:%d\n", ids);
+    char *buf = (char *)malloc(bufSize);
+    assert(buf);
+    char *left = buf;
+    char space = ' ';
+    int count = 0;
+    for (int i = 0; i < psiSize; i++)
+    {
+        memcpy(left, (char *)(recvSet[psiMsgIndexs[i]].data()), ids);
+        count += ids;
+        left += ids;
+        memcpy(left, &space, 1);
+        count += 1;
+        left += 1;
+    }
+    printf("===>>new file count:%d\n", count);
+    writeFileAllByCPP(fileName, buf, bufSize - 1);
+    free(buf);
+}
+void generateDataFromFile(const char *inFile, vector<vector<oc::u8>> &dataSet, int ids)
+{
+    long filesize = 0;
+    char *bufread = readFileAllByCPP(inFile, &filesize);
+    assert(bufread);
+    int dataSetSize = dataSet.size();
+    char *left = bufread;
+    char *end = bufread + filesize;
+    int i = 0;
+    for (; left < end; left += ids + 1, i++)
+    {
+        if (i < dataSetSize)
+        {
+            dataSet[i].resize(ids);
+            memcpy((char *)(dataSet[i].data()), left, ids);
+        }
+    }
+    free(bufread);
+    printf("===>>i:%d\n", i);
+    assert(i == dataSetSize);
+}
 int main(int argc, char **argv)
 {
     // int ptype = atoi(argv[1]); //0 send;1 recv
@@ -197,10 +228,10 @@ int main(int argc, char **argv)
     // int receiverSize = atoi(argv[5]);
     oc::CLP cmd;
     cmd.parse(argc, argv);
-    cmd.setDefault("w", 500);
+    cmd.setDefault("w", 60);
     int matrixWidth = cmd.get<oc::u64>("w");
     printf("w:%d\n", matrixWidth);
-    cmd.setDefault("h", 20);
+    cmd.setDefault("h", 10);
     int logHeight = cmd.get<oc::u64>("h");
     printf("logH:%d\n", logHeight);
     cmd.setDefault("ss", 5000000);
@@ -209,14 +240,22 @@ int main(int argc, char **argv)
     cmd.setDefault("rs", 5000000);
     int receiverSize = cmd.get<oc::u64>("rs");
     printf("rs:%d\n", receiverSize);
+    //数据id的长度
+    cmd.setDefault("ids", 18);
+    int ids = cmd.get<oc::u64>("ids");
+    printf("ids:%d,length of id\n", ids);
     //命令行传种子
     cmd.setDefault("sd", 0);
     seed = cmd.get<oc::u64>("sd");
     printf("sd:%d\n", seed);
     //数据文件路径
-    cmd.setDefault("path", "");
-    string path = cmd.get<string>("path");
-    printf("path:%s\n", path.c_str());
+    cmd.setDefault("in", "");
+    string inFile = cmd.get<string>("in");
+    printf("in:%s,input file\n", inFile.c_str());
+    //保存数据文件路径
+    cmd.setDefault("out", "");
+    string outFile = cmd.get<string>("out");
+    printf("out:%s,output file\n", outFile.c_str());
     // int hash2LengthInBytes = atoi(argv[6]);
     int hash2LengthInBytes = 10;
     // int bucket2ForComputeH2Output = atoi(argv[7]);
@@ -244,12 +283,14 @@ int main(int argc, char **argv)
                   << " -r 1    to run a receiver.\n"
                   << "\n"
                   << "Parameters:\n"
-                  << " -ss     log(#elements) on sender side.\n"
-                  << " -rs     log(#elements) on receiver side.\n"
+                  << " -ss     the size of dataset on sender side.\n"
+                  << " -rs     the size of dataset on receiver side.\n"
+                  << " -ids    the size of an ID for bytes.\n"
                   << " -w      width of the matrix.\n"
                   << " -h      log(height) of the matrix.\n"
-                  << " -sd     common seed (optional).\n"
-                  << " -path   return data from file-path.\n"
+                  << " -sd     common seed (optional) for sender and receiver.\n"
+                  << " -in     the input file path .\n"
+                  << " -out    the output file path saving psi-set.\n"
                   << " -ip     ip address .\n"
                   << " -port   port.\n";
         return 0;
@@ -265,29 +306,13 @@ int main(int argc, char **argv)
         startTime(timeCompute);
         vector<vector<oc::u8>> sendSet;
         sendSet.resize(senderSize);
-        if (path == "")
+        if (inFile == "")
         {
             generateDataSet(0, senderSize, seed, sendSet);
         }
         else
         {
-            long filesize = 0;
-            char *bufread = readFileAllByCPP(path.c_str(), &filesize);
-            // generateDataSetByFile(path, senderSize, sendSet);
-            assert(bufread);
-            char *left = bufread;
-            char *end = bufread + filesize;
-            int i = 0;
-            for (; left < end; left += 19, i++)
-            {
-                if (i < senderSize)
-                {
-                    sendSet[i].resize(18);
-                    memcpy((char *)(sendSet[i].data()), left, 18);
-                }
-            }
-            printf("===>>i:%d\n", i);
-            assert(i == senderSize);
+            generateDataFromFile(inFile.c_str(), sendSet, ids);
         }
         int useTime = getEndTime(timeCompute);
         printf("生成发送者数据集:%dms\n", useTime);
@@ -344,8 +369,8 @@ int main(int argc, char **argv)
         printf("发送方用时：%dms,totalCyc:%d\n", useTime, totalCyc);
         printf("----------->>>>>>main over \n");
         // //释放mem, sender
-        freeTimeCompute(timeCompute);
-        freeChannel(client);
+        releaseTimeCompute(timeCompute);
+        releaseChannel(client);
         printf("----------->>>>>>main over \n");
         return 0;
     }
@@ -358,29 +383,13 @@ int main(int argc, char **argv)
         vector<vector<oc::u8>> recvSet;
         recvSet.resize(receiverSize);
         // generateDataSet(1, receiverSize, seed, recvSet);
-        if (path == "")
+        if (inFile == "")
         {
             generateDataSet(1, receiverSize, seed, recvSet);
         }
         else
         {
-            // generateDataSetByFile(path, receiverSize, recvSet);
-            long filesize = 0;
-            char *bufread = readFileAllByCPP(path.c_str(), &filesize);
-            assert(bufread);
-            char *left = bufread;
-            char *end = bufread + filesize;
-            int i = 0;
-            for (; left < end; left += 19, i++)
-            {
-                if (i < receiverSize)
-                {
-                    recvSet[i].resize(18);
-                    memcpy((char *)(recvSet[i].data()), left, 18);
-                }
-            }
-            printf("===>>i:%d\n", i);
-            assert(i == receiverSize);
+            generateDataFromFile(inFile.c_str(), recvSet, ids);
         }
         int useTime = getEndTime(timeCompute);
         printf("生成接收者数据集:%dms\n", useTime);
@@ -422,11 +431,11 @@ int main(int argc, char **argv)
         fg = psiRecv.genenateAllHashesMap();
         assert(fg == 0);
         int time1 = getEndTime(timeHashMapNeed);
-        freeTimeCompute(timeHashMapNeed);
+        releaseTimeCompute(timeHashMapNeed);
         printf("生成hashMap表所需时间:%dms\n", time1);
         //循环接收对方发来的hashOutput
         char *hashOutput = nullptr;
-        vector<int> psiMsgIndexs;
+        vector<oc::u32> psiMsgIndexs;
         int totalCyc = senderSize / bucket2ForComputeH2Output;
         for (auto low = 0; low < senderSize; low += bucket2ForComputeH2Output)
         {
@@ -446,9 +455,17 @@ int main(int argc, char **argv)
         // }
         printf("psi count:%d\n", psiMsgIndexs.size());
         // assert(psiMsgIndexs.size() == Psi_Size);
+        if (outFile != "")
+        {
+            savePsiToFile(outFile.c_str(), psiMsgIndexs, recvSet);
+            int useTime1 = getEndTime(timeCompute);
+            printf("psi数据保存到文件：%dms\n", useTime1 - useTime);
+        }
+
         // //释放mem
-        freeTimeCompute(timeCompute);
-        freeChannel(server);
+        releaseTimeCompute(timeCompute);
+        releaseChannel(server);
+        printf("===>>main end\n");
         return 0;
     }
 

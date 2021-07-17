@@ -233,9 +233,9 @@ namespace osuCrypto
             hashInputs[i] = new u8[this->matrixWidthInBytes];
         }
         //接收集合中的每个元素
-        for (auto low = 0; low < receiverSize; low += this->bucket2ForComputeH2Output)
+        for (auto low = 0; low < this->receiverSize; low += this->bucket2ForComputeH2Output)
         {
-            auto up = low + this->bucket2ForComputeH2Output < receiverSize ? low + this->bucket2ForComputeH2Output : receiverSize;
+            auto up = low + this->bucket2ForComputeH2Output < this->receiverSize ? low + this->bucket2ForComputeH2Output : this->receiverSize;
             for (auto j = low; j < up; ++j)
             {
                 memset(hashInputs[j - low], 0, this->matrixWidthInBytes);
@@ -268,7 +268,7 @@ namespace osuCrypto
     //PsiReceiver,接收对方发来的hash输出
     int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8 *recvBuff, const u64 recvBufSize,
                                                      const u64 low, const u64 up,
-                                                     vector<int> &psiMsgIndex)
+                                                     vector<u32> &psiMsgIndex)
     {
         if (recvBufSize != (up - low) * this->hash2LengthInBytes)
         {

@@ -361,7 +361,7 @@ int main(int argc, char *argv[])
         // printOTMsgSingle(recoverMsgWidthOutput);
         // cout << "===choicesWidthInput:" << choicesWidthInput << endl;
         printf("===>ubuff_size:%d\n", buff_size);
-        freeChannel(client);
+        releaseChannel(client);
         int msTime = getEndTime(t);
         freeTimeCompute(t);
         printf("(width=%d)iknp receiver need times:%dms\n", width, msTime);
@@ -414,7 +414,7 @@ int main(int argc, char *argv[])
             return -1;
         }
         // printOTMsg(encMsgOutput);
-        freeChannel(server);
+        releaseChannel(server);
         int msTime = getEndTime(t);
         freeTimeCompute(t);
         printf("(width=%d)iknp sender need times:%dms\n", width, msTime);
@@ -484,7 +484,7 @@ int main(int argc, char *argv[])
         fg = recv_data(sender, &recv_buff);
         printf("===fg:%d,buff:%s\n", fg, recv_buff);
         // sleep(1);
-        freeChannel(sender);
+        releaseChannel(sender);
     }
     if (ptype == SERVER)
     {

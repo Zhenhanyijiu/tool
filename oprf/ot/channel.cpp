@@ -213,7 +213,7 @@ void *initChannel(PartType pltype, const char *address, int port)
 
     return nullptr;
 }
-int freeChannel(void *ch)
+int releaseChannel(void *ch)
 {
     if (ch)
     {
