@@ -44,7 +44,7 @@
 
 >> 结论：随着矩阵宽度w的增加，安全求交耗时t也随之增加；如图：  
 
->> ![ avatar ](500w.jpg)
+>> ![ images ](https://github.com/Zhenhanyijiu/tool/blob/main/oprf/psi_bin/500w.jpg)
 
 >> h=20,height=2^20
 >>+ 表2
