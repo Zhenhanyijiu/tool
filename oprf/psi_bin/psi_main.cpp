@@ -261,6 +261,7 @@ int main(int argc, char **argv)
     // int bucket2ForComputeH2Output = atoi(argv[7]);
     int bucket2ForComputeH2Output = 256;
     bucket2ForComputeH2Output = 512;
+    bucket2ForComputeH2Output = 1000000;
     //ip地址
     cmd.setDefault("ip", "127.0.0.1");
     string address = cmd.get<string>("ip");
@@ -367,7 +368,7 @@ int main(int argc, char **argv)
         }
         useTime = getEndTime(timeCompute);
         printf("发送方用时：%dms,totalCyc:%d\n", useTime, totalCyc);
-        printf("----------->>>>>>main over \n");
+        // printf("----------->>>>>>main over \n");
         // //释放mem, sender
         releaseTimeCompute(timeCompute);
         releaseChannel(client);

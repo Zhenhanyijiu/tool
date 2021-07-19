@@ -61,9 +61,9 @@ namespace osuCrypto
             memset(this->transHashInputs[i].data(), 0, this->receiverSizeInBytes);
         }
         this->encMsgOutput.resize(this->matrixWidth);
-        cout << "===>commonSeed before:" << this->commonSeed << endl;
+        // cout << "===>commonSeed before:" << this->commonSeed << endl;
         this->commonSeed = commonSeed;
-        cout << "===>commonSeed after :" << this->commonSeed << endl;
+        // cout << "===>commonSeed after :" << this->commonSeed << endl;
         PRNG localRng(localSeed);
         return this->iknpOteSender.init(localRng);
     }
