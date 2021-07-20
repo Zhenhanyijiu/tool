@@ -261,7 +261,7 @@ int main(int argc, char **argv)
     // int bucket2ForComputeH2Output = atoi(argv[7]);
     int bucket2ForComputeH2Output = 256;
     bucket2ForComputeH2Output = 512;
-    bucket2ForComputeH2Output = 1000000;
+    bucket2ForComputeH2Output = 10240;
     //ip地址
     cmd.setDefault("ip", "127.0.0.1");
     string address = cmd.get<string>("ip");
