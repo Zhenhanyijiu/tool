@@ -1,9 +1,12 @@
 ## 安全求交PSI
 ### 编译
-> 生成可执行文件  
+
+> 生成可执行文件 
+ 
 >>+ bash build.sh
 
-> 命令行参数意义  
+> 命令行参数意义 
+ 
 >> Experimenet flag:
 >>+ -r 0    to run a sender.[表示发送端]  
 >>+ -r 1    to run a receiver.[表示接收端]  
@@ -18,18 +21,26 @@
 >>+ -in     the input file path.[输入数据文件路径]  
 >>+ -out    the output file path saving psi-set.[保存交集数据的文件路径]  
 >>+ -ip     ip address.[ip地址]  
->>+ -port   port.[端口]  
-### 运行
-> 发送端：
+>>+ -port   port.[端口] 
+
+### 运行  
+
+> 发送端：  
+
 >+ ./psi -r 0 -w 60 -h 10 -ss 5000000 -rs 5000000 -sd 22 -in ../../../500w_1.txt  
 
 > 接收端：
+
 >+ ./psi -r 1 -w 60 -h 10 -ss 5000000 -rs 5000000 -sd 22 -in ../../../500w_2.txt -out ../../../500w_2_save.txt
-### 测试
+
+### 测试  
+
 > 机器环境：i5-6200U,16G-ddr3  
 
 > 双方都是5百万数据  
+
 >> h=10,height=1024  
+
 >>+ 表1  
 
 >> | w | h  | ss(百万) | rs(百万) | time(s) |  
@@ -47,6 +58,7 @@
 >> ![ images ](500w.jpg)
 
 >> h=20,height=2^20  
+
 >>+ 表2  
 
 >> | w | h  | ss(百万) | rs(百万) | time(s) |  
