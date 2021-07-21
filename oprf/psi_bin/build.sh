@@ -19,17 +19,19 @@ THIRD_INCLUDE=../../libOTe/cryptoTools/thirdparty/linux
 
 #crytoTools 源码编译，将miracl源码一起编译，不链接静态库
 #g++ -I./include -m64 -O2 -Wall -fPIC -shared -o mir-nom64 source/*.c
-if [ -f "test_np" ];then
-    rm -rf test_psi
+if [ -f "psi" ];then
+    rm -rf psi
 fi
 if [ $? -ne 0 ]; then
     echo "===failed"
 else
     echo "===succeed"
 fi
+
+################C++11##############3
 BLAKE2_DIR=../../libOTe/cryptoTools/cryptoTools/Crypto/blake2
-g++ -g -Wall -O2 -msse3 -msse2 -msse4.1 -maes -DENABLE_MIRACL=ON \
--DENABLE_CIRCUITS=OFF -DENABLE_CPP_14=ON -DENABLE_FULL_GSL=ON \
+g++ -g -std=c++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
+-DENABLE_MIRACL=ON -DENABLE_CIRCUITS=OFF \
 -I${CRYPTO_INCLUDE} -I${THIRD_INCLUDE}/miracl \
 -I${THIRD_INCLUDE}/miracl/miracl/include \
 -I${BLAKE2_DIR} \
@@ -41,7 +43,22 @@ ${CRYPTO_INCLUDE}/cryptoTools/Crypto/*.cpp \
 ../ot/*cpp \
 -lpthread \
 psi_main.cpp -o psi
-###################
+# ################C++14##############3
+# BLAKE2_DIR=../../libOTe/cryptoTools/cryptoTools/Crypto/blake2
+# g++ -g -Wall -O2 -msse3 -msse2 -msse4.1 -maes -DENABLE_MIRACL=ON \
+# -DENABLE_CIRCUITS=OFF -DENABLE_CPP_14=ON -DENABLE_FULL_GSL=ON \
+# -I${CRYPTO_INCLUDE} -I${THIRD_INCLUDE}/miracl \
+# -I${THIRD_INCLUDE}/miracl/miracl/include \
+# -I${BLAKE2_DIR} \
+# -I../ot \
+# ${THIRD_INCLUDE}/miracl/miracl/source/*.c \
+# ${CRYPTO_INCLUDE}/cryptoTools/Common/*.cpp \
+# ${BLAKE2_DIR}/*c \
+# ${CRYPTO_INCLUDE}/cryptoTools/Crypto/*.cpp \
+# ../ot/*cpp \
+# -lpthread \
+# psi_main.cpp -o psi
+# ###################
 # g++ -Wall -O2 -msse3 -msse2 -msse4.1 -maes -DENABLE_MIRACL=ON \
 # -DENABLE_CIRCUITS=OFF -DENABLE_CPP_14=ON -DENABLE_FULL_GSL=ON \
 # -DENABLE_NASM \
