@@ -5,3 +5,4 @@ channel/.idea
 oprf/.idea
 oprf/test_np
 a.out
+scp.sh
