@@ -1,7 +1,34 @@
 #include "psi.h"
+#include <assert.h>
+#include <sys/time.h>
 #include <cryptoTools/Crypto/RandomOracle.h>
 namespace osuCrypto
 {
+    typedef struct TimeComputeType
+    {
+        struct timeval start;
+        struct timeval end;
+    } TimeCompute;
+    void *newTimeCompute()
+    {
+        return malloc(sizeof(TimeCompute));
+    }
+    void startTime(void *tc)
+    {
+        assert(tc != nullptr);
+        TimeCompute *t = (TimeCompute *)tc;
+        gettimeofday(&(t->start), NULL);
+    }
+    //毫秒
+    long int getEndTime(void *tc)
+    {
+        assert(tc != nullptr);
+        TimeCompute *t = (TimeCompute *)tc;
+        gettimeofday(&(t->end), NULL);
+        long int time_use = (t->end.tv_sec - t->start.tv_sec) * 1000000 +
+                            (t->end.tv_usec - t->start.tv_usec);
+        return time_use / 1000;
+    }
     //common function
     //将所有输入的数据以相同的方式H1做映射，以dataSetOutput返回
     void transformInputByH1(const AES &commonAes, const u64 h1LengthInBytes,
@@ -123,7 +150,11 @@ namespace osuCrypto
         commonPrng.get((u8 *)&commonKey, sizeof(block));
         commonAes.setKey(commonKey);
         block *recvSet = new block[receiverSize];
+        void *timeCompute = newTimeCompute();
+        startTime(timeCompute);
         transformInputByH1(commonAes, this->h1LengthInBytes, receiverSet, recvSet);
+        long useTime = getEndTime(timeCompute);
+        printf("===>>计算H1用时:%ld\n", useTime);
         ////////// Transform input end //////////////////
         /*********for cycle start*********/
         for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
