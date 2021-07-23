@@ -2,14 +2,14 @@
 from Cython.Build import cythonize
 from distutils.core import setup, Extension
 from Cython.Distutils import build_ext
-import os
-train_dir = '/mnt/d/ubuntu/pyproject'
-train_dir = '../../cproject/tool/libOTe/cryptoTools/cryptoTools/Common/'
-datanames = os.listdir(train_dir)
-print("===ls:", datanames)
-for dataname in datanames:
-    if os.path.splitext(dataname)[1] == '.cpp':  # 目录下包含.cpp 的文件
-        print(dataname)
+# import os
+# train_dir = '/mnt/d/ubuntu/pyproject'
+# train_dir = '../../cproject/tool/libOTe/cryptoTools/cryptoTools/Common/'
+# datanames = os.listdir(train_dir)
+# print("===ls:", datanames)
+# for dataname in datanames:
+#     if os.path.splitext(dataname)[1] == '.cpp':  # 目录下包含.cpp 的文件
+#         print(dataname)
 
 
 # setup(ext_modules=cythonize(

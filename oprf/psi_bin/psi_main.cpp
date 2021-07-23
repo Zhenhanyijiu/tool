@@ -17,7 +17,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <fstream>
-#define Psi_Size 2000000
+// #define Psi_Size 5000
 namespace oc = osuCrypto;
 
 using namespace std;
@@ -37,13 +37,13 @@ void startTime(void *tc)
     gettimeofday(&(t->start), NULL);
 }
 //毫秒
-int getEndTime(void *tc)
+long int getEndTime(void *tc)
 {
     assert(tc != nullptr);
     TimeCompute *t = (TimeCompute *)tc;
     gettimeofday(&(t->end), NULL);
-    int time_use = (t->end.tv_sec - t->start.tv_sec) * 1000000 +
-                   (t->end.tv_usec - t->start.tv_usec);
+    long int time_use = (t->end.tv_sec - t->start.tv_sec) * 1000000 +
+                        (t->end.tv_usec - t->start.tv_usec);
     return time_use / 1000;
 }
 void releaseTimeCompute(void *tc)
@@ -98,8 +98,10 @@ void check_recover(const vector<array<oc::block, 2>> &otMsg,
 //psi test use socket
 #if 1
 oc::u64 seed;
+oc::u64 Psi_Size;
 void generateDataSet(const int ptype, const oc::u64 dataSize,
-                     oc::u64 seed, vector<vector<oc::u8>> &dataSet)
+                     oc::u64 seed, oc::u64 ids,
+                     vector<vector<oc::u8>> &dataSet)
 {
     oc::PRNG prng(oc::toBlock(0x77887788 + seed));
     //sender
@@ -111,15 +113,15 @@ void generateDataSet(const int ptype, const oc::u64 dataSize,
         oc::u64 i = 0;
         for (; i < psiSize; i++)
         {
-            dataSet[i].resize(16);
-            prng.get(dataSet[i].data(), 16);
+            dataSet[i].resize(ids);
+            prng.get(dataSet[i].data(), ids);
         }
         prng.SetSeed(oc::toBlock(0x998877 + seed));
         for (; i < dataSize; i++)
         {
-            dataSet[i].resize(16);
+            dataSet[i].resize(ids);
             // dataSet[i] = prng.get<oc::block>();
-            prng.get(dataSet[i].data(), 16);
+            prng.get(dataSet[i].data(), ids);
         }
     }
     //receiver
@@ -127,11 +129,12 @@ void generateDataSet(const int ptype, const oc::u64 dataSize,
     {
         for (oc::u64 i = 0; i < dataSet.size(); i++)
         {
-            dataSet[i].resize(16);
+            dataSet[i].resize(ids);
             // dataSet[i] = prng.get<oc::block>();
-            prng.get(dataSet[i].data(), 16);
+            prng.get(dataSet[i].data(), ids);
         }
     }
+    printf("===>>id length:%d\n", dataSet[0].size());
 }
 //write file
 void writeFileAllByCPP(const char *fileName, const char *buf, long bufSize)
@@ -248,6 +251,10 @@ int main(int argc, char **argv)
     cmd.setDefault("sd", 0);
     seed = cmd.get<oc::u64>("sd");
     printf("sd:%d\n", seed);
+    //交集个数
+    cmd.setDefault("ps", 200000);
+    Psi_Size = cmd.get<oc::u64>("ps");
+    printf("交集个数，ps:%ld\n", Psi_Size);
     //数据文件路径
     cmd.setDefault("in", "");
     string inFile = cmd.get<string>("in");
@@ -309,14 +316,14 @@ int main(int argc, char **argv)
         sendSet.resize(senderSize);
         if (inFile == "")
         {
-            generateDataSet(0, senderSize, seed, sendSet);
+            generateDataSet(0, senderSize, seed, ids, sendSet);
         }
         else
         {
             generateDataFromFile(inFile.c_str(), sendSet, ids);
         }
-        int useTime = getEndTime(timeCompute);
-        printf("生成发送者数据集:%dms\n", useTime);
+        long int useTimeGenData = getEndTime(timeCompute);
+        printf("send:生成发送者数据集:%ldms\n", useTimeGenData);
         //生成sendSet end
         //printOTMsgSingle(sendSet);
         oc::PsiSender psiSender;
@@ -354,6 +361,8 @@ int main(int argc, char **argv)
         // assert(matrixAxorD);
         fg = psiSender.recoverMatrixC((oc::u8 *)matrixAxorD, n, sendSet);
         assert(fg == 0);
+        long useTimeOT = getEndTime(timeCompute);
+        printf("send:OT所需时间:%ldms\n", useTimeOT - useTimeGenData);
         //循环发送hash输出给对方
         char *hashOutputOnceBuff = nullptr;
         oc::u64 hashOutputOnceBuffSize = 0;
@@ -366,13 +375,14 @@ int main(int argc, char **argv)
             n = send_data(client, hashOutputOnceBuff, hashOutputOnceBuffSize);
             assert(n == hashOutputOnceBuffSize);
         }
-        useTime = getEndTime(timeCompute);
-        printf("发送方用时：%dms,totalCyc:%d\n", useTime, totalCyc);
+        long useTimeFind = getEndTime(timeCompute);
+        printf("send: 匹配find用时：%ldms,totalCyc:%d\n", useTimeFind - useTimeOT, totalCyc);
+        printf("send: 总用时:%ldms\n", useTimeFind);
         // printf("----------->>>>>>main over \n");
         // //释放mem, sender
         releaseTimeCompute(timeCompute);
         releaseChannel(client);
-        printf("----------->>>>>>main over \n");
+        printf("send:----------->>>>>>main over \n");
         return 0;
     }
     if (ptype == SERVER) //recv
@@ -386,14 +396,14 @@ int main(int argc, char **argv)
         // generateDataSet(1, receiverSize, seed, recvSet);
         if (inFile == "")
         {
-            generateDataSet(1, receiverSize, seed, recvSet);
+            generateDataSet(1, receiverSize, seed, ids, recvSet);
         }
         else
         {
             generateDataFromFile(inFile.c_str(), recvSet, ids);
         }
-        int useTime = getEndTime(timeCompute);
-        printf("生成接收者数据集:%dms\n", useTime);
+        long int useTimeGenData = getEndTime(timeCompute);
+        printf("recv:生成接收者数据集:%ldms\n", useTimeGenData);
         //生成recvSet end
         //printOTMsgSingle(recvSet);
         oc::PsiReceiver psiRecv;
@@ -425,15 +435,17 @@ int main(int argc, char **argv)
                                          (oc::u8 **)&matrixADBuff, matrixADBuffSize);
         assert(fg == 0);
         n = send_data(server, matrixADBuff, matrixADBuffSize);
+        long useTimeOT = getEndTime(timeCompute);
+        printf("recv:OT所需时间:%ldms\n", useTimeOT - useTimeGenData);
         //本方生成hashMap
-        void *timeHashMapNeed = newTimeCompute();
-        assert(timeHashMapNeed);
-        startTime(timeHashMapNeed);
+        // void *timeHashMapNeed = newTimeCompute();
+        // assert(timeHashMapNeed);
+        // startTime(timeHashMapNeed);
         fg = psiRecv.genenateAllHashesMap();
         assert(fg == 0);
-        int time1 = getEndTime(timeHashMapNeed);
-        releaseTimeCompute(timeHashMapNeed);
-        printf("生成hashMap表所需时间:%dms\n", time1);
+        long int useTimeHashMap = getEndTime(timeCompute);
+        // releaseTimeCompute(timeHashMapNeed);
+        printf("recv:生成hashMap表所需时间:%ldms\n", useTimeHashMap - useTimeOT);
         //循环接收对方发来的hashOutput
         char *hashOutput = nullptr;
         vector<oc::u32> psiMsgIndexs;
@@ -448,19 +460,21 @@ int main(int argc, char **argv)
             // printf("fg=>%d\n", fg);
             assert(fg == 0);
         }
-        useTime = getEndTime(timeCompute);
-        printf("接收方用时：%dms,totalCyc:%d\n", useTime, totalCyc);
+        long useTimeFind = getEndTime(timeCompute);
+        printf("recv: 匹配find用时：%ldms,totalCyc:%d\n", useTimeFind - useTimeHashMap, totalCyc);
+        // printf("recv:匹配find用时：%ldms\n", useTimeFind - useTimeHashMap);
+        printf("recv:总用时：%ldms\n", useTimeFind);
         // for (int i = 0; i < psiMsgIndexs.size(); i++)
         // {
         //     cout << "i:" << i << "," << recvSet[i] << endl;
         // }
-        printf("psi count:%d\n", psiMsgIndexs.size());
-        // assert(psiMsgIndexs.size() == Psi_Size);
+        printf("psi count:%ld\n", psiMsgIndexs.size());
+        assert(psiMsgIndexs.size() == Psi_Size);
         if (outFile != "")
         {
             savePsiToFile(outFile.c_str(), psiMsgIndexs, recvSet);
-            int useTime1 = getEndTime(timeCompute);
-            printf("psi数据保存到文件：%dms\n", useTime1 - useTime);
+            long int useTime1 = getEndTime(timeCompute);
+            printf("psi数据保存到文件：%ldms\n", useTime1 - useTimeFind);
         }
 
         // //释放mem
