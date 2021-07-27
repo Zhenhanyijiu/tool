@@ -153,8 +153,8 @@ namespace osuCrypto
         void *timeCompute = newTimeCompute();
         startTime(timeCompute);
         transformInputByH1(commonAes, this->h1LengthInBytes, receiverSet, recvSet);
-        long useTime = getEndTime(timeCompute);
-        printf("===>>计算H1用时:%ld\n", useTime);
+        long useTimeH1 = getEndTime(timeCompute);
+        printf("===>>计算H1用时:%ld\n", useTimeH1);
         ////////// Transform input end //////////////////
         /*********for cycle start*********/
         for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
@@ -236,6 +236,8 @@ namespace osuCrypto
                 }
             }
         }
+        long useTimeCycle = getEndTime(timeCompute);
+        printf("===>>计算H1之后,生成矩阵A,D用时:%ld\n", useTimeCycle - useTimeH1);
         /*********for cycle end*********/
         //将uBuff输出并发送给对方
         *sendMatrixADBuff = this->sendMatrixADBuff.data();
