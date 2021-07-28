@@ -2,8 +2,12 @@
 #     ctypedef struct PyObject:
 #         pass
 #     long Py_REFCNT(PyObject *)
+from libcpp.vector cimport vector
+from libc cimport string
+from libc.stdio cimport printf
 cdef extern from "Rectangle.h" namespace "shapes":
     void print_area(char *msg)
+    # ctypedef u8 unsigned char
     cdef cppclass Rectangle:
         Rectangle()
         Rectangle(int x0, int y0, int x1, int y1)        
@@ -30,3 +34,20 @@ def py_rect_func():
     area=pyR.getArea()
     w,h=pyR.getSize()
     return w,h,area
+def test_vector():
+    cdef vector[vector[char]] vv
+    vv.resize(10)
+    cdef int num=vv.size()
+    # bytes ch=b'1111'
+    # ch=bytes()
+    # ch=b'1111'
+    cdef char ff[10]
+    string.memset(ff,0,10)
+    # string.memcpy(ff,ch,4)
+    ba=bytearray(b'aaa')
+    
+    cdef char* buf=ba
+    string.memcpy(ff,buf,3)
+    print("num:",num)
+    printf("===>>%s\n",ff)
+    

@@ -1,5 +1,6 @@
 namespace shapes
 {
+    typedef unsigned char u8;
     class Rectangle
     {
     public:

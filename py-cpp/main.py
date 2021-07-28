@@ -16,3 +16,4 @@ if __name__ == '__main__':
     print('======', 20000)
     print(">>>>>>")
     d = dict()
+    test_vector()
