@@ -5,6 +5,7 @@ namespace osuCrypto
     typedef unsigned long int u64_t;
     // typedef block block_t;
     typedef unsigned char u8_t;
+    typedef unsigned int u32_t;
     //psi 发送方结构定义如下
     class PsiSender
     {
@@ -37,13 +38,13 @@ namespace osuCrypto
                  u64_t matrixWidth, u64_t logHeight, u64_t senderSize,
                  u64_t hash2LengthInBytes = 10, u64_t bucket2ForComputeH2Output = 256);
         //生成基本ot协议的公共参数，并发送给对方
-        int genPublicParamFromNpot(u8 **pubParamBuf, u64 &pubParamBufByteSize);
+        int genPublicParamFromNpot(u8_t **pubParamBuf, u64_t *pubParamBufByteSize);
         //接收对方pk0Buf；并生成T^R的结果uBuffOutput，发送给对方
-        int genMatrixTxorRBuff(u8 *pk0Buf, const u64 pk0BufSize,
-                               u8 **uBuffOutputTxorR, u64 &uBuffOutputSize);
+        int genMatrixTxorRBuff(u8_t *pk0Buf, const u64_t pk0BufSize,
+                               u8_t **uBuffOutputTxorR, u64_t *uBuffOutputSize);
         //接收recvMatrixADBuff，恢复出矩阵C
-        int recoverMatrixC(const u8 *recvMatrixADBuff, const u64 recvMatixADBuffSize,
-                           const vector<vector<u8>> &senderSet);
+        int recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize,
+                           const vector<vector<u8_t>> senderSet);
         //循环计算hash输出并发送给对方
         /*
         for (auto low = 0; low < senderSize; low += bucket2) {
@@ -53,8 +54,8 @@ namespace osuCrypto
                                             u8 **sendBuff, u64 &sendBuffSize)
         }
         */
-        int computeHashOutputToReceiverOnce(const u64 low, const u64 up,
-                                            u8 **sendBuff, u64 &sendBuffSize);
+        int computeHashOutputToReceiverOnce(const u64_t low, const u64_t up,
+                                            u8_t **sendBuff, u64_t *sendBuffSize);
     };
     //psi 接收方结构定义如下
     class PsiReceiver
@@ -88,13 +89,13 @@ namespace osuCrypto
                  u64_t matrixWidth, u64_t logHeight, u64_t receiverSize,
                  u64_t hash2LengthInBytes = 10, u64_t bucket2ForComputeH2Output = 256);
         //接收对方发送过来的公共参数，并根据baseot choices输入生成pk0s,并发送过对方
-        int genPK0FromNpot(u8 *pubParamBuf, const u64 pubParamBufByteSize,
-                           u8 **pk0Buf, u64 &pk0BufSize);
+        int genPK0FromNpot(u8_t *pubParamBuf, const u64_t pubParamBufByteSize,
+                           u8_t **pk0Buf, u64_t *pk0BufSize);
         //uBuffInput对方发送过来的，作为输入，encMsgOutput为输出，大小在外部初始化
         // int getEncMsg(const vector<block> &uBuffInput, vector<array<block, 2>> &encMsgOutput);
-        int getSendMatrixADBuff(const u8 *uBuffInputTxorR, const int uBuffInputSize,
-                                const vector<vector<u8>> &receiverSet,
-                                u8 **sendMatrixADBuff, u64 &sendMatixADBuffSize);
+        int getSendMatrixADBuff(const u8_t *uBuffInputTxorR, const u64_t uBuffInputSize,
+                                const vector<vector<u8_t>> receiverSet,
+                                u8_t **sendMatrixADBuff, u64_t *sendMatixADBuffSize);
         //将sendMatrixADBuff发送给对方之后，接下来生成AllHashMap
         int genenateAllHashesMap();
         // Receive hash outputs from sender and compute PSI
@@ -106,7 +107,7 @@ namespace osuCrypto
                                             u64 low, u64 up, vector<int> &psiMsgIndex)
         }
         */
-        int recvFromSenderAndComputePSIOnce(const u8 *recvBuff, const u64 recvBufSize,
-                                            const u64 low, const u64 up, vector<u32> &psiMsgIndex);
+        int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
+                                            const u64_t low, const u64_t up, vector<u32_t> *psiMsgIndex);
     };
 }

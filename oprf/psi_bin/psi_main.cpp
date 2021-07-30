@@ -348,7 +348,7 @@ int main(int argc, char **argv)
         //[1]生成基本ot协议的公共参数，并发送给对方
         oc::u8 *pubParamBuf = nullptr;
         oc::u64 pubParamBufSize = 0;
-        fg = psiSender.genPublicParamFromNpot(&pubParamBuf, pubParamBufSize);
+        fg = psiSender.genPublicParamFromNpot(&pubParamBuf, &pubParamBufSize);
         assert(fg == 0);
         int n = send_data(client, (char *)pubParamBuf, pubParamBufSize);
         assert(n == pubParamBufSize);
@@ -359,7 +359,7 @@ int main(int argc, char **argv)
         oc::u8 *uBuffOutput = nullptr;
         oc::u64 uBuffOutputSize = 0;
         //[3]输入pk0s，生成uBuffOutput,并发送给对方
-        fg = psiSender.genMatrixTxorRBuff((oc::u8 *)pk0sBuf, n, &uBuffOutput, uBuffOutputSize);
+        fg = psiSender.genMatrixTxorRBuff((oc::u8 *)pk0sBuf, n, &uBuffOutput, &uBuffOutputSize);
         assert(fg == 0);
         n = send_data(client, (char *)uBuffOutput, uBuffOutputSize);
         assert(n == uBuffOutputSize);
@@ -379,7 +379,7 @@ int main(int argc, char **argv)
         for (auto low = 0; low < senderSize; low += bucket2ForComputeH2Output)
         {
             auto up = low + bucket2ForComputeH2Output < senderSize ? low + bucket2ForComputeH2Output : senderSize;
-            fg = psiSender.computeHashOutputToReceiverOnce(low, up, (oc::u8 **)&hashOutputOnceBuff, hashOutputOnceBuffSize);
+            fg = psiSender.computeHashOutputToReceiverOnce(low, up, (oc::u8 **)&hashOutputOnceBuff, &hashOutputOnceBuffSize);
             assert(fg == 0);
             n = send_data(client, hashOutputOnceBuff, hashOutputOnceBuffSize);
             assert(n == hashOutputOnceBuffSize);
@@ -435,7 +435,7 @@ int main(int argc, char **argv)
         oc::u64 pk0sBufSize = 0;
         int n = recv_data(server, &pubParamBuf);
         assert(n > 0);
-        fg = psiRecv.genPK0FromNpot((oc::u8 *)pubParamBuf, n, (oc::u8 **)&pk0sBuf, pk0sBufSize);
+        fg = psiRecv.genPK0FromNpot((oc::u8 *)pubParamBuf, n, (oc::u8 **)&pk0sBuf, &pk0sBufSize);
         assert(fg == 0);
         n = send_data(server, pk0sBuf, pk0sBufSize);
         //接收 uBuffInput,并生成matrixAD,并发送给对方
@@ -445,7 +445,7 @@ int main(int argc, char **argv)
         n = recv_data(server, &uBuffInput);
         assert(n > 0);
         fg = psiRecv.getSendMatrixADBuff((oc::u8 *)uBuffInput, n, recvSet,
-                                         (oc::u8 **)&matrixADBuff, matrixADBuffSize);
+                                         (oc::u8 **)&matrixADBuff, &matrixADBuffSize);
         assert(fg == 0);
         n = send_data(server, matrixADBuff, matrixADBuffSize);
         long useTimeOT = getEndTime(timeCompute);
@@ -469,7 +469,7 @@ int main(int argc, char **argv)
             n = recv_data(server, &hashOutput);
             assert(n > 0);
             fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput,
-                                                         n, low, up, psiMsgIndexs);
+                                                         n, low, up, &psiMsgIndexs);
             // printf("fg=>%d\n", fg);
             assert(fg == 0);
         }
@@ -493,7 +493,8 @@ int main(int argc, char **argv)
         // //释放mem
         releaseTimeCompute(timeCompute);
         releaseChannel(server);
-        printf("===>>main end\n");
+        int nn = 0;
+        printf("===>>main end.sizeof(int)=%d\n", sizeof(nn));
         return 0;
     }
 

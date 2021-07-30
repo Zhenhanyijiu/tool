@@ -65,8 +65,8 @@ namespace osuCrypto
     PsiReceiver::PsiReceiver() {}
     PsiReceiver::~PsiReceiver() {}
     int PsiReceiver::init(u8_t *commonSeed, u8_t *localSeed,
-                          u64 matrixWidth, u64 logHeight, u64 receiverSize,
-                          u64 hash2LengthInBytes, u64 bucket2ForComputeH2Output)
+                          u64_t matrixWidth, u64_t logHeight, u64_t receiverSize,
+                          u64_t hash2LengthInBytes, u64_t bucket2ForComputeH2Output)
     {
         this->matrixWidth = matrixWidth;
         this->matrixWidthInBytes = (matrixWidth + 7) >> 3;
@@ -96,15 +96,15 @@ namespace osuCrypto
         PRNG localRng(localSeedBlock);
         return this->iknpOteSender.init(localRng);
     }
-    int PsiReceiver::genPK0FromNpot(u8 *pubParamBuf, const u64 pubParamBufByteSize,
-                                    u8 **pk0Buf, u64 &pk0BufSize)
+    int PsiReceiver::genPK0FromNpot(u8_t *pubParamBuf, const u64_t pubParamBufByteSize,
+                                    u8_t **pk0Buf, u64_t *pk0BufSize)
     {
         return this->iknpOteSender.genPK0FromNpot(pubParamBuf, pubParamBufByteSize,
-                                                  pk0Buf, pk0BufSize);
+                                                  pk0Buf, *pk0BufSize);
     }
-    int PsiReceiver::getSendMatrixADBuff(const u8 *uBuffInput, const int uBuffInputSize,
-                                         const vector<vector<u8>> &receiverSet,
-                                         u8 **sendMatrixADBuff, u64 &sendMatixADBuffSize)
+    int PsiReceiver::getSendMatrixADBuff(const u8_t *uBuffInput, const u64_t uBuffInputSize,
+                                         const vector<vector<u8_t>> receiverSet,
+                                         u8_t **sendMatrixADBuff, u64_t *sendMatixADBuffSize)
     {
         int ublocksize = uBuffInputSize / sizeof(block);
         vector<block> uBuffInputBlock(ublocksize);
@@ -243,7 +243,7 @@ namespace osuCrypto
         /*********for cycle end*********/
         //将uBuff输出并发送给对方
         *sendMatrixADBuff = this->sendMatrixADBuff.data();
-        sendMatixADBuffSize = this->heightInBytes * this->matrixWidth;
+        *sendMatixADBuffSize = this->heightInBytes * this->matrixWidth;
         /****************************/
         // 最后释放空间
         for (auto i = 0; i < widthBucket1; ++i)
@@ -301,9 +301,9 @@ namespace osuCrypto
         return 0;
     }
     //PsiReceiver,接收对方发来的hash输出
-    int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8 *recvBuff, const u64 recvBufSize,
-                                                     const u64 low, const u64 up,
-                                                     vector<u32> &psiMsgIndex)
+    int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
+                                                     const u64_t low, const u64_t up,
+                                                     vector<u32_t> *psiMsgIndex)
     {
         if (recvBufSize != (up - low) * this->hash2LengthInBytes)
         {
@@ -322,7 +322,7 @@ namespace osuCrypto
                            recvBuff + idx * this->hash2LengthInBytes,
                            this->hash2LengthInBytes) == 0)
                 {
-                    psiMsgIndex.push_back(found->second[i].second);
+                    psiMsgIndex->push_back(found->second[i].second);
                     break;
                 }
             }
@@ -370,13 +370,13 @@ namespace osuCrypto
         return this->iknpOteReceiver.init(localRng);
     }
     //生成公共参数
-    int PsiSender::genPublicParamFromNpot(u8 **pubParamBuf, u64 &pubParamBufByteSize)
+    int PsiSender::genPublicParamFromNpot(u8_t **pubParamBuf, u64_t *pubParamBufByteSize)
     {
-        return this->iknpOteReceiver.genPublicParamFromNpot(pubParamBuf, pubParamBufByteSize);
+        return this->iknpOteReceiver.genPublicParamFromNpot(pubParamBuf, *pubParamBufByteSize);
     }
     //接收到pk0s,并生成T异或R 将uBuffOutput发送给对方
-    int PsiSender::genMatrixTxorRBuff(u8 *pk0Buf, const u64 pk0BufSize,
-                                      u8 **uBuffOutput, u64 &uBuffOutputSize)
+    int PsiSender::genMatrixTxorRBuff(u8_t *pk0Buf, const u64_t pk0BufSize,
+                                      u8_t **uBuffOutput, u64_t *uBuffOutputSize)
     {
         int fg = this->iknpOteReceiver.getEncKeyFromNpot(pk0Buf, pk0BufSize);
         if (fg)
@@ -391,12 +391,12 @@ namespace osuCrypto
             return fg;
         }
         *uBuffOutput = (u8 *)this->uBuffOutput.data();
-        uBuffOutputSize = this->uBuffOutput.size() * sizeof(block);
+        *uBuffOutputSize = this->uBuffOutput.size() * sizeof(block);
         return 0;
     }
     //
-    int PsiSender::recoverMatrixC(const u8 *recvMatrixADBuff, const u64 recvMatixADBuffSize,
-                                  const vector<vector<u8>> &senderSet)
+    int PsiSender::recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize,
+                                  const vector<vector<u8_t>> senderSet)
     {
         auto locationInBytes = (this->logHeight + 7) / 8;    // logHeight==1
         auto widthBucket1 = sizeof(block) / locationInBytes; // 16/1
@@ -505,8 +505,8 @@ namespace osuCrypto
         return 0;
     }
     //计算本方的hash输出并发送给对方
-    int PsiSender::computeHashOutputToReceiverOnce(const u64 low, const u64 up,
-                                                   u8 **sendBuff, u64 &sendBuffSize)
+    int PsiSender::computeHashOutputToReceiverOnce(const u64_t low, const u64_t up,
+                                                   u8_t **sendBuff, u64_t *sendBuffSize)
     {
         //H2
         RandomOracle H(this->hash2LengthInBytes);
@@ -532,7 +532,7 @@ namespace osuCrypto
             memcpy(this->hashOutputBuff.data() + (j - low) * this->hash2LengthInBytes,
                    hashOutput, this->hash2LengthInBytes);
         }
-        sendBuffSize = (up - low) * this->hash2LengthInBytes;
+        *sendBuffSize = (up - low) * this->hash2LengthInBytes;
         *sendBuff = this->hashOutputBuff.data();
         return 0;
     }
