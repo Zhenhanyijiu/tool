@@ -7,10 +7,10 @@ namespace shapes
 
     Rectangle::Rectangle(int X0, int Y0, int X1, int Y1)
     {
-        x0 = X0;
-        y0 = Y0;
-        x1 = X1;
-        y1 = Y1;
+        this->x0 = X0;
+        this->y0 = Y0;
+        this->x1 = X1;
+        this->y1 = Y1;
     }
 
     int Rectangle::getArea()
@@ -20,8 +20,10 @@ namespace shapes
 
     void Rectangle::getSize(int *width, int *height)
     {
-        (*width) = x1 - x0;
-        (*height) = y1 - y0;
+        // (*width) = x1 - x0;
+        // (*height) = y1 - y0;
+        *width = x1 - x0;
+        *height = y1 - y0;
     }
 
     void Rectangle::move(int dx, int dy)
@@ -31,7 +33,7 @@ namespace shapes
         x1 += dx;
         y1 += dy;
     }
-    void print_area(char *msg)
+    void print_area(const char *msg)
     {
         printf("this is a print function:%s...\n", msg);
     }

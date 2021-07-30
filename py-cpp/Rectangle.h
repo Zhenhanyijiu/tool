@@ -1,15 +1,18 @@
+#include "tmp.h"
 namespace shapes
 {
-    typedef unsigned char u8;
+    typedef uchar u8;
     class Rectangle
     {
-    public:
+    private:
         int x0, y0, x1, y1;
+
+    public:
         Rectangle();
         Rectangle(int x0, int y0, int x1, int y1);
         int getArea();
         void getSize(int *width, int *height);
         void move(int dx, int dy);
     };
-    void print_area(char *msg);
+    void print_area(const char *msg);
 }

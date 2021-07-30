@@ -64,7 +64,7 @@ namespace osuCrypto
     //psiReceiver
     PsiReceiver::PsiReceiver() {}
     PsiReceiver::~PsiReceiver() {}
-    int PsiReceiver::init(block commonSeed, block localSeed,
+    int PsiReceiver::init(u8_t *commonSeed, u8_t *localSeed,
                           u64 matrixWidth, u64 logHeight, u64 receiverSize,
                           u64 hash2LengthInBytes, u64 bucket2ForComputeH2Output)
     {
@@ -89,9 +89,11 @@ namespace osuCrypto
         }
         this->encMsgOutput.resize(this->matrixWidth);
         // cout << "===>commonSeed before:" << this->commonSeed << endl;
-        this->commonSeed = commonSeed;
+        this->commonSeed = toBlock((u8 *)commonSeed);
+
         // cout << "===>commonSeed after :" << this->commonSeed << endl;
-        PRNG localRng(localSeed);
+        block localSeedBlock = toBlock((u8 *)localSeed);
+        PRNG localRng(localSeedBlock);
         return this->iknpOteSender.init(localRng);
     }
     int PsiReceiver::genPK0FromNpot(u8 *pubParamBuf, const u64 pubParamBufByteSize,
@@ -331,13 +333,13 @@ namespace osuCrypto
     PsiSender::PsiSender() {}
     PsiSender::~PsiSender() {}
     //初始化
-    int PsiSender::init(block commonSeed, block localSeed,
-                        u64 matrixWidth, u64 logHeight, u64 senderSize,
-                        u64 hash2LengthInBytes, u64 bucket2ForComputeH2Output)
+    int PsiSender::init(u8_t *commonSeed, u8_t *localSeed,
+                        u64_t matrixWidth, u64_t logHeight, u64_t senderSize,
+                        u64_t hash2LengthInBytes, u64_t bucket2ForComputeH2Output)
     {
         this->matrixWidth = matrixWidth;
         this->matrixWidthInBytes = (matrixWidth + 7) >> 3;
-        this->commonSeed = commonSeed;
+        this->commonSeed = toBlock((u8 *)commonSeed);
         this->logHeight = logHeight;
         this->height = 1 << logHeight;
         this->heightInBytes = (this->height + 7) >> 3; //除以8
@@ -348,7 +350,8 @@ namespace osuCrypto
         this->h1LengthInBytes = 32;
         //todo
         this->hash2LengthInBytes = hash2LengthInBytes;
-        PRNG localRng(localSeed);
+        block localSeedBlock = toBlock((u8 *)localSeed);
+        PRNG localRng(localSeedBlock);
         //初始化一个向量r，长度为width
         this->choicesWidthInput.resize(matrixWidth);
         this->choicesWidthInput.randomize(localRng);

@@ -305,7 +305,12 @@ int main(int argc, char **argv)
     }
     int ptype = cmd.get<oc::u64>("r");
     printf("r:%d\n", ptype);
-    oc::block commonSeed = oc::toBlock(0x333333 + seed);
+
+    // oc::block commonSeed = oc::toBlock(0x333333 + seed);
+    oc::u64 comSeed = 0x333333 + seed;
+    oc::u8_t commonSeed[16];
+    memset(commonSeed, 0, 16);
+    memcpy(commonSeed, (oc::u8_t *)&comSeed, 8);
     if (ptype == CLIENT)
     {
         //生成sendSet
@@ -327,7 +332,11 @@ int main(int argc, char **argv)
         //生成sendSet end
         //printOTMsgSingle(sendSet);
         oc::PsiSender psiSender;
-        oc::block localSeed = oc::toBlock(0x111111 + seed);
+        // oc::block localSeed = oc::toBlock(0x111111 + seed);
+        oc::u64 locSeed = 0x111111 + seed;
+        oc::u8_t localSeed[16];
+        memset(localSeed, 0, 16);
+        memcpy(localSeed, (oc::u8_t *)&locSeed, 8);
         //初始化一个socket连接
         void *client = initChannel(CLIENT, address.c_str(), port);
         assert(client);
@@ -407,7 +416,11 @@ int main(int argc, char **argv)
         //生成recvSet end
         //printOTMsgSingle(recvSet);
         oc::PsiReceiver psiRecv;
-        oc::block localSeed = oc::toBlock(0x222222 + seed);
+        // oc::block localSeed = oc::toBlock(0x222222 + seed);
+        oc::u64 locSeed = 0x111111 + seed;
+        oc::u8_t localSeed[16];
+        memset(localSeed, 0, 16);
+        memcpy(localSeed, (oc::u8_t *)&locSeed, 8);
         //初始化一个socket连接
         void *server = initChannel(SERVER, address.c_str(), port);
         assert(server);

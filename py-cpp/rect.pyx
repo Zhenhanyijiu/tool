@@ -5,25 +5,27 @@
 from libcpp.vector cimport vector
 from libc cimport string
 from libc.stdio cimport printf
+cdef extern from "tmp.h":
+    ctypedef unsigned char uchar
 cdef extern from "Rectangle.h" namespace "shapes":
-    void print_area(char *msg)
-    # ctypedef u8 unsigned char
+    ctypedef uchar u8
+    void print_area(const char *msg)    
     cdef cppclass Rectangle:
         Rectangle()
         Rectangle(int x0, int y0, int x1, int y1)        
         int getArea()
         void getSize(int *width, int *height)
-        void move(int dx, int dy)
+        # void move(int dx, int dy)
 
 cdef class pyRectangle:
     cdef Rectangle *p_Rect    
     def __init__(self):
-        self.p_Rect=new Rectangle(0,0,3,7)
+        self.p_Rect=new Rectangle(0,0,30,71)
     def getArea(self):
         return self.p_Rect.getArea()
     def getSize(self):
-        cdef int w,h
-        self.p_Rect.getSize(&w,&h)
+        cdef int w,h        
+        self.p_Rect.getSize(&w,&h)        
         return w,h
 
 def print_area_py():
@@ -32,8 +34,8 @@ def print_area_py():
 def py_rect_func():
     pyR=pyRectangle()
     area=pyR.getArea()
-    w,h=pyR.getSize()
-    return w,h,area
+    w1,h1=pyR.getSize()
+    return w1,h1,area
 def test_vector():
     cdef vector[vector[char]] vv
     vv.resize(10)

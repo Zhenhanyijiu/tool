@@ -2,6 +2,9 @@
 #include <unordered_map>
 namespace osuCrypto
 {
+    typedef unsigned long int u64_t;
+    // typedef block block_t;
+    typedef unsigned char u8_t;
     //psi 发送方结构定义如下
     class PsiSender
     {
@@ -30,14 +33,14 @@ namespace osuCrypto
         PsiSender();
         ~PsiSender();
         //初始化psiSender
-        int init(block commonSeed, block localSeed,
-                 u64 matrixWidth, u64 logHeight, u64 senderSize,
-                 u64 hash2LengthInBytes = 10, u64 bucket2ForComputeH2Output = 256);
+        int init(u8_t *commonSeed, u8_t *localSeed,
+                 u64_t matrixWidth, u64_t logHeight, u64_t senderSize,
+                 u64_t hash2LengthInBytes = 10, u64_t bucket2ForComputeH2Output = 256);
         //生成基本ot协议的公共参数，并发送给对方
         int genPublicParamFromNpot(u8 **pubParamBuf, u64 &pubParamBufByteSize);
         //接收对方pk0Buf；并生成T^R的结果uBuffOutput，发送给对方
         int genMatrixTxorRBuff(u8 *pk0Buf, const u64 pk0BufSize,
-                               u8 **uBuffOutput, u64 &uBuffOutputSize);
+                               u8 **uBuffOutputTxorR, u64 &uBuffOutputSize);
         //接收recvMatrixADBuff，恢复出矩阵C
         int recoverMatrixC(const u8 *recvMatrixADBuff, const u64 recvMatixADBuffSize,
                            const vector<vector<u8>> &senderSet);
@@ -80,15 +83,16 @@ namespace osuCrypto
         PsiReceiver();
         ~PsiReceiver();
         //初始化psiReceiver
-        int init(block commonSeed, block localSeed,
-                 u64 matrixWidth, u64 logHeight, u64 receiverSize,
-                 u64 hash2LengthInBytes = 10, u64 bucket2ForComputeH2Output = 256);
+        //commonSeed,localSeed 长度为16字节
+        int init(u8_t *commonSeed, u8_t *localSeed,
+                 u64_t matrixWidth, u64_t logHeight, u64_t receiverSize,
+                 u64_t hash2LengthInBytes = 10, u64_t bucket2ForComputeH2Output = 256);
         //接收对方发送过来的公共参数，并根据baseot choices输入生成pk0s,并发送过对方
         int genPK0FromNpot(u8 *pubParamBuf, const u64 pubParamBufByteSize,
                            u8 **pk0Buf, u64 &pk0BufSize);
         //uBuffInput对方发送过来的，作为输入，encMsgOutput为输出，大小在外部初始化
         // int getEncMsg(const vector<block> &uBuffInput, vector<array<block, 2>> &encMsgOutput);
-        int getSendMatrixADBuff(const u8 *uBuffInput, const int uBuffInputSize,
+        int getSendMatrixADBuff(const u8 *uBuffInputTxorR, const int uBuffInputSize,
                                 const vector<vector<u8>> &receiverSet,
                                 u8 **sendMatrixADBuff, u64 &sendMatixADBuffSize);
         //将sendMatrixADBuff发送给对方之后，接下来生成AllHashMap
