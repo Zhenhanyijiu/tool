@@ -29,7 +29,7 @@ else
 fi
 #-DENABLE_CIRCUITS=OFF 
 #-DENABLE_MIRACL=ON \
-################C++11##############3
+################C++11##############
 BLAKE2_DIR=../../libOTe/cryptoTools/cryptoTools/Crypto/blake2
 g++ -g -std=c++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
 -DENABLE_MIRACL \
@@ -42,8 +42,8 @@ ${CRYPTO_INCLUDE}/cryptoTools/Common/*.cpp \
 ${BLAKE2_DIR}/*c \
 ${CRYPTO_INCLUDE}/cryptoTools/Crypto/*.cpp \
 ../ot/*cpp \
--lpthread \
 psi_main.cpp -o psi
+# -lpthread \
 # ################C++14##############3
 # BLAKE2_DIR=../../libOTe/cryptoTools/cryptoTools/Crypto/blake2
 # g++ -g -Wall -O2 -msse3 -msse2 -msse4.1 -maes -DENABLE_MIRACL=ON \
