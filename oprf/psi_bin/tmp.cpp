@@ -483,7 +483,12 @@ int main()
     }
     useTime = getEndTime(timeC);
     printf("===memcpy use time:%dms,size:%ld,count:%d\n", useTime, size, i);
-
+    printf("===>>test malloc...\n");
+    float num = 9 * 1024 * 1024 * 1024;
+    char *p = (char *)malloc(num);
+    printf("===>>num:%ld,sizeof:%ld\n", (unsigned long int)num, sizeof(num));
+    assert(p != NULL);
+    return 0;
     printf("===>>写文件。。。\n");
     startTime(timeC);
     writeFileAllByCPP("../../../500w_1_w.txt", buf, size);

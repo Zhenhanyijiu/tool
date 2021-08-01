@@ -252,7 +252,7 @@ int main(int argc, char **argv)
     seed = cmd.get<oc::u64>("sd");
     printf("sd:%d\n", seed);
     //交集个数
-    cmd.setDefault("ps", 200000);
+    cmd.setDefault("ps", 2000000);
     Psi_Size = cmd.get<oc::u64>("ps");
     printf("交集个数，ps:%ld\n", Psi_Size);
     //数据文件路径
@@ -333,16 +333,16 @@ int main(int argc, char **argv)
         //printOTMsgSingle(sendSet);
         oc::PsiSender psiSender;
         // oc::block localSeed = oc::toBlock(0x111111 + seed);
-        oc::u64 locSeed = 0x111111 + seed;
-        oc::u8_t localSeed[16];
-        memset(localSeed, 0, 16);
-        memcpy(localSeed, (oc::u8_t *)&locSeed, 8);
+        // oc::u64 locSeed = 0x111111 + seed;
+        // oc::u8_t localSeed[16];
+        // memset(localSeed, 0, 16);
+        // memcpy(localSeed, (oc::u8_t *)&locSeed, 8);
         //初始化一个socket连接
         void *client = initChannel(CLIENT, address.c_str(), port);
         assert(client);
         //psi 发送方
         startTime(timeCompute);
-        int fg = psiSender.init(commonSeed, localSeed, matrixWidth, logHeight, senderSize,
+        int fg = psiSender.init(commonSeed, senderSize, matrixWidth, logHeight,
                                 hash2LengthInBytes, bucket2ForComputeH2Output);
         assert(fg == 0);
         //[1]生成基本ot协议的公共参数，并发送给对方
@@ -417,17 +417,18 @@ int main(int argc, char **argv)
         //printOTMsgSingle(recvSet);
         oc::PsiReceiver psiRecv;
         // oc::block localSeed = oc::toBlock(0x222222 + seed);
-        oc::u64 locSeed = 0x111111 + seed;
-        oc::u8_t localSeed[16];
-        memset(localSeed, 0, 16);
-        memcpy(localSeed, (oc::u8_t *)&locSeed, 8);
+        // oc::u64 locSeed = 0x111111 + seed;
+        // oc::u8_t localSeed[16];
+        // memset(localSeed, 0, 16);
+        // memcpy(localSeed, (oc::u8_t *)&locSeed, 8);
         //初始化一个socket连接
         void *server = initChannel(SERVER, address.c_str(), port);
         assert(server);
         startTime(timeCompute);
         //初始化psiRecv
-        int fg = psiRecv.init(commonSeed, localSeed, matrixWidth, logHeight,
-                              receiverSize, hash2LengthInBytes, bucket2ForComputeH2Output);
+        int fg = psiRecv.init(commonSeed, receiverSize, senderSize,
+                              matrixWidth, logHeight, hash2LengthInBytes,
+                              bucket2ForComputeH2Output);
         assert(fg == 0);
         //接收对方的公共参数,并生成 pk0sBuf
         char *pubParamBuf = nullptr;
