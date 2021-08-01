@@ -29,6 +29,8 @@ namespace osuCrypto
         vector<vector<u8>> transHashInputs;
         vector<vector<u8>> hashInputs;
         IknpOtExtReceiver iknpOteReceiver;
+        u64 lowL;
+        // u64 upR;
 
     public:
         PsiSender();
@@ -45,6 +47,8 @@ namespace osuCrypto
         //接收recvMatrixADBuff，恢复出矩阵C
         int recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize,
                            const vector<vector<u8_t>> senderSet);
+        //判断发送方发送数据是否结束
+        int isSendEnd();
         //循环计算hash输出并发送给对方
         /*
         for (auto low = 0; low < senderSize; low += bucket2) {
@@ -54,8 +58,9 @@ namespace osuCrypto
                                             u8 **sendBuff, u64 &sendBuffSize)
         }
         */
-        int computeHashOutputToReceiverOnce(const u64_t low, const u64_t up,
-                                            u8_t **sendBuff, u64_t *sendBuffSize);
+        // int computeHashOutputToReceiverOnce(const u64_t low, const u64_t up,
+        // u8_t **sendBuff, u64_t *sendBuffSize);
+        int computeHashOutputToReceiverOnce(u8_t **sendBuff, u64_t *sendBuffSize);
     };
     //psi 接收方结构定义如下
     class PsiReceiver
@@ -80,6 +85,7 @@ namespace osuCrypto
         vector<vector<u8>> transHashInputs;
         std::unordered_map<u64, std::vector<std::pair<block, u32>>> allHashes;
         IknpOtExtSender iknpOteSender;
+        u64 lowL;
 
     public:
         PsiReceiver();
@@ -99,6 +105,8 @@ namespace osuCrypto
                                 u8_t **sendMatrixADBuff, u64_t *sendMatixADBuffSize);
         //将sendMatrixADBuff发送给对方之后，接下来生成AllHashMap
         int genenateAllHashesMap();
+        //判断接收方接收数据是否结束
+        int isRecvEnd();
         // Receive hash outputs from sender and compute PSI
         /*
         for (auto low = 0; low < senderSize; low += bucket2) {
@@ -109,6 +117,6 @@ namespace osuCrypto
         }
         */
         int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
-                                            const u64_t low, const u64_t up, vector<u32_t> *psiMsgIndex);
+                                            vector<u32_t> *psiMsgIndex);
     };
 }

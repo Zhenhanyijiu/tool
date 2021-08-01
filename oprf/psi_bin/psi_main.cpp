@@ -75,13 +75,13 @@ void printOTMsgSingle(const vector<oc::block> &otMsg)
 void check_recover(const vector<array<oc::block, 2>> &otMsg,
                    const oc::BitVector &rChoices, const vector<oc::block> &otMsgRecover)
 {
-    int size = otMsg.size();
+    unsigned int size = otMsg.size();
     if (size != rChoices.size() || size != otMsgRecover.size())
     {
         printf("=======check error!!! error\n");
         return;
     }
-    for (int i = 0; i < size; i++)
+    for (auto i = 0; i < size; i++)
     {
         oc::u8 r = rChoices[i];
         cout << "第" << i + 1 << "对：\n";
@@ -134,7 +134,7 @@ void generateDataSet(const int ptype, const oc::u64 dataSize,
             prng.get(dataSet[i].data(), ids);
         }
     }
-    printf("===>>id length:%d\n", dataSet[0].size());
+    printf("===>>id length:%ld\n", dataSet[0].size());
 }
 //write file
 void writeFileAllByCPP(const char *fileName, const char *buf, long bufSize)
@@ -232,25 +232,25 @@ int main(int argc, char **argv)
     oc::CLP cmd;
     cmd.parse(argc, argv);
     cmd.setDefault("w", 60);
-    int matrixWidth = cmd.get<oc::u64>("w");
-    printf("w:%d\n", matrixWidth);
+    oc::u64 matrixWidth = cmd.get<oc::u64>("w");
+    printf("w:%ld\n", matrixWidth);
     cmd.setDefault("h", 10);
-    int logHeight = cmd.get<oc::u64>("h");
-    printf("logH:%d\n", logHeight);
+    oc::u64 logHeight = cmd.get<oc::u64>("h");
+    printf("logH:%ld\n", logHeight);
     cmd.setDefault("ss", 5000000);
-    int senderSize = cmd.get<oc::u64>("ss");
-    printf("ss:%d\n", senderSize);
+    oc::u64 senderSize = cmd.get<oc::u64>("ss");
+    printf("ss:%ld\n", senderSize);
     cmd.setDefault("rs", 5000000);
-    int receiverSize = cmd.get<oc::u64>("rs");
-    printf("rs:%d\n", receiverSize);
+    oc::u64 receiverSize = cmd.get<oc::u64>("rs");
+    printf("rs:%ld\n", receiverSize);
     //数据id的长度
     cmd.setDefault("ids", 18);
-    int ids = cmd.get<oc::u64>("ids");
-    printf("ids:%d,length of id\n", ids);
+    oc::u64 ids = cmd.get<oc::u64>("ids");
+    printf("ids:%ld,length of id\n", ids);
     //命令行传种子
     cmd.setDefault("sd", 0);
     seed = cmd.get<oc::u64>("sd");
-    printf("sd:%d\n", seed);
+    printf("sd:%ld\n", seed);
     //交集个数
     cmd.setDefault("ps", 2000000);
     Psi_Size = cmd.get<oc::u64>("ps");
@@ -351,7 +351,7 @@ int main(int argc, char **argv)
         fg = psiSender.genPublicParamFromNpot(&pubParamBuf, &pubParamBufSize);
         assert(fg == 0);
         int n = send_data(client, (char *)pubParamBuf, pubParamBufSize);
-        assert(n == pubParamBufSize);
+        assert((oc::u64)n == pubParamBufSize);
         //[2]接收对方发过来的pk0sBuff
         char *pk0sBuf = nullptr;
         n = recv_data(client, &pk0sBuf);
@@ -362,7 +362,7 @@ int main(int argc, char **argv)
         fg = psiSender.genMatrixTxorRBuff((oc::u8 *)pk0sBuf, n, &uBuffOutput, &uBuffOutputSize);
         assert(fg == 0);
         n = send_data(client, (char *)uBuffOutput, uBuffOutputSize);
-        assert(n == uBuffOutputSize);
+        assert((oc::u64)n == uBuffOutputSize);
         //[4]接收MatrixAxorD,生成矩阵C
         char *matrixAxorD = nullptr;
         n = recv_data(client, &matrixAxorD);
@@ -376,15 +376,21 @@ int main(int argc, char **argv)
         char *hashOutputOnceBuff = nullptr;
         oc::u64 hashOutputOnceBuffSize = 0;
         int totalCyc = senderSize / bucket2ForComputeH2Output;
-        for (auto low = 0; low < senderSize; low += bucket2ForComputeH2Output)
+        int count = 0;
+        int ret = psiSender.isSendEnd();
+        printf("===>>isSendEnd:%d\n", ret);
+        // for (auto low = 0; low < senderSize;low+=bucket2ForComputeH2Output)
+        for (; psiSender.isSendEnd() == 0;)
         {
-            auto up = low + bucket2ForComputeH2Output < senderSize ? low + bucket2ForComputeH2Output : senderSize;
-            fg = psiSender.computeHashOutputToReceiverOnce(low, up, (oc::u8 **)&hashOutputOnceBuff, &hashOutputOnceBuffSize);
+            // auto up = low + bucket2ForComputeH2Output < senderSize ? low + bucket2ForComputeH2Output : senderSize;
+            fg = psiSender.computeHashOutputToReceiverOnce((oc::u8 **)&hashOutputOnceBuff, &hashOutputOnceBuffSize);
             assert(fg == 0);
             n = send_data(client, hashOutputOnceBuff, hashOutputOnceBuffSize);
-            assert(n == hashOutputOnceBuffSize);
+            count++;
+            assert((oc::u64)n == hashOutputOnceBuffSize);
         }
         long useTimeFind = getEndTime(timeCompute);
+        printf("===>>count:%d\n", count);
         printf("send: 匹配find用时：%ldms,totalCyc:%d\n", useTimeFind - useTimeOT, totalCyc);
         printf("send: 总用时:%ldms\n", useTimeFind);
         // printf("----------->>>>>>main over \n");
@@ -464,18 +470,26 @@ int main(int argc, char **argv)
         char *hashOutput = nullptr;
         vector<oc::u32> psiMsgIndexs;
         int totalCyc = senderSize / bucket2ForComputeH2Output;
-        for (auto low = 0; low < senderSize; low += bucket2ForComputeH2Output)
+        printf("===>>sendersize:%ld,bucket2ForComputeH2Output:%d,totalCyc:%d\n",
+               senderSize, bucket2ForComputeH2Output, totalCyc);
+        int count = 0;
+        for (; psiRecv.isRecvEnd() == 0;)
         {
-            auto up = low + bucket2ForComputeH2Output < senderSize ? low + bucket2ForComputeH2Output : senderSize;
+            // auto up = low + bucket2ForComputeH2Output < senderSize ? low + bucket2ForComputeH2Output : senderSize;
             n = recv_data(server, &hashOutput);
+            count++;
+            if (n <= 0)
+            {
+                printf("===>>count:%d\n", count);
+            }
             assert(n > 0);
             fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput,
-                                                         n, low, up, &psiMsgIndexs);
+                                                         n, &psiMsgIndexs);
             // printf("fg=>%d\n", fg);
             assert(fg == 0);
         }
         long useTimeFind = getEndTime(timeCompute);
-        printf("recv: 匹配find用时：%ldms,totalCyc:%d\n", useTimeFind - useTimeHashMap, totalCyc);
+        printf("recv: 匹配find用时：%ldms,totalCyc:%d,count:%d\n", useTimeFind - useTimeHashMap, totalCyc, count);
         // printf("recv:匹配find用时：%ldms\n", useTimeFind - useTimeHashMap);
         printf("recv:总用时：%ldms\n", useTimeFind);
         // for (int i = 0; i < psiMsgIndexs.size(); i++)
@@ -495,7 +509,7 @@ int main(int argc, char **argv)
         releaseTimeCompute(timeCompute);
         releaseChannel(server);
         int nn = 0;
-        printf("===>>main end.sizeof(int)=%d\n", sizeof(nn));
+        printf("===>>main end.sizeof(int)=%ld\n", sizeof(nn));
         return 0;
     }
 

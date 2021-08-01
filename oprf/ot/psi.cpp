@@ -95,6 +95,7 @@ namespace osuCrypto
         // cout << "===>commonSeed after :" << this->commonSeed << endl;
         // block localSeedBlock = toBlock((u8 *)localSeed);
         PRNG localRng(this->commonSeed);
+        this->lowL = (u64)0;
         return this->iknpOteSender.init(localRng);
     }
     int PsiReceiver::genPK0FromNpot(u8_t *pubParamBuf, const u64_t pubParamBufByteSize,
@@ -301,16 +302,21 @@ namespace osuCrypto
         }
         return 0;
     }
+    //判断接收方接收数据是否结束
+    int PsiReceiver::isRecvEnd()
+    {
+        return this->lowL < this->senderSize ? 0 : 1;
+    }
     //PsiReceiver,接收对方发来的hash输出
     int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
-                                                     const u64_t low, const u64_t up,
                                                      vector<u32_t> *psiMsgIndex)
     {
-        if (recvBufSize != (up - low) * this->hash2LengthInBytes)
+        auto up = this->lowL + this->bucket2ForComputeH2Output < this->senderSize ? this->lowL + this->bucket2ForComputeH2Output : this->senderSize;
+        if (recvBufSize != (up - this->lowL) * this->hash2LengthInBytes)
         {
             return -122;
         }
-        for (auto idx = 0; idx < up - low; ++idx)
+        for (auto idx = 0; idx < up - this->lowL; ++idx)
         {
             u64 mapIdx = *(u64 *)(recvBuff + idx * this->hash2LengthInBytes);
             auto found = this->allHashes.find(mapIdx);
@@ -328,6 +334,7 @@ namespace osuCrypto
                 }
             }
         }
+        this->lowL += this->bucket2ForComputeH2Output;
         return 0;
     }
     //******************PsiSender*********************//
@@ -367,6 +374,9 @@ namespace osuCrypto
             this->transHashInputs[i].resize(this->senderSizeInBytes);
             // memset(this->transHashInputs[i].data(), 0, this->senderSizeInBytes);
         }
+        this->lowL = (u64)0;
+        // this->upR = (u64)0;
+        printf("===>>this->lowL:%ld\n", this->lowL);
         return this->iknpOteReceiver.init(localRng);
     }
     //生成公共参数
@@ -504,36 +514,43 @@ namespace osuCrypto
         printf(">>>>>>>>>> sendSet,end\n");
         return 0;
     }
-    //计算本方的hash输出并发送给对方
-    int PsiSender::computeHashOutputToReceiverOnce(const u64_t low, const u64_t up,
-                                                   u8_t **sendBuff, u64_t *sendBuffSize)
+    //
+    int PsiSender::isSendEnd()
     {
+        // printf("===>>in issend,lowL:%ld\n", this->lowL);
+        return this->lowL < this->senderSize ? 0 : 1;
+    }
+    //计算本方的hash输出并发送给对方
+    int PsiSender::computeHashOutputToReceiverOnce(u8_t **sendBuff, u64_t *sendBuffSize)
+    {
+        auto upR = this->lowL + this->bucket2ForComputeH2Output < this->senderSize ? this->lowL + this->bucket2ForComputeH2Output : this->senderSize;
         //H2
         RandomOracle H(this->hash2LengthInBytes);
         u8 hashOutput[sizeof(block)];
-        for (auto j = low; j < up; ++j)
+        for (auto j = this->lowL; j < upR; ++j)
         {
-            memset(this->hashInputs[j - low].data(), 0, this->matrixWidthInBytes);
+            memset(this->hashInputs[j - this->lowL].data(), 0, this->matrixWidthInBytes);
         }
         for (auto i = 0; i < this->matrixWidth; ++i)
         {
-            for (auto j = low; j < up; ++j)
+            for (auto j = this->lowL; j < upR; ++j)
             {
-                this->hashInputs[j - low][i >> 3] |=
+                this->hashInputs[j - this->lowL][i >> 3] |=
                     (u8)((bool)(this->transHashInputs[i][j >> 3] & (1 << (j & 7))))
                     << (i & 7);
             }
         }
-        for (auto j = low; j < up; ++j)
+        for (auto j = this->lowL; j < upR; ++j)
         {
             H.Reset();
-            H.Update(this->hashInputs[j - low].data(), this->matrixWidthInBytes);
+            H.Update(this->hashInputs[j - this->lowL].data(), this->matrixWidthInBytes);
             H.Final(hashOutput);
-            memcpy(this->hashOutputBuff.data() + (j - low) * this->hash2LengthInBytes,
+            memcpy(this->hashOutputBuff.data() + (j - this->lowL) * this->hash2LengthInBytes,
                    hashOutput, this->hash2LengthInBytes);
         }
-        *sendBuffSize = (up - low) * this->hash2LengthInBytes;
+        *sendBuffSize = (upR - this->lowL) * this->hash2LengthInBytes;
         *sendBuff = this->hashOutputBuff.data();
+        this->lowL += this->bucket2ForComputeH2Output;
         return 0;
     }
 }
