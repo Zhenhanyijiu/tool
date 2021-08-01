@@ -63,7 +63,7 @@ namespace osuCrypto
     }
     //psiReceiver
     PsiReceiver::PsiReceiver() {}
-    PsiReceiver::~PsiReceiver() {}
+    // PsiReceiver::~PsiReceiver() {}
     int PsiReceiver::init(u8_t *commonSeed, u64_t receiverSize, u64_t senderSize,
                           u64_t matrixWidth, u64_t logHeight, u64_t hash2LengthInBytes,
                           u64_t bucket2ForComputeH2Output)
@@ -339,7 +339,7 @@ namespace osuCrypto
     }
     //******************PsiSender*********************//
     PsiSender::PsiSender() {}
-    PsiSender::~PsiSender() {}
+    // PsiSender::~PsiSender() {}
     //初始化
     int PsiSender::init(u8_t *commonSeed, u64_t senderSize, u64_t matrixWidth, u64_t logHeight,
                         u64_t hash2LengthInBytes, u64_t bucket2ForComputeH2Output)

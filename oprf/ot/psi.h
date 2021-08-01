@@ -34,7 +34,7 @@ namespace osuCrypto
 
     public:
         PsiSender();
-        ~PsiSender();
+        // ~PsiSender();
         //初始化psiSender
         int init(u8_t *commonSeed, u64_t senderSize, u64_t matrixWidth, u64_t logHeight,
                  u64_t hash2LengthInBytes = 10, u64_t bucket2ForComputeH2Output = 256);
@@ -89,7 +89,7 @@ namespace osuCrypto
 
     public:
         PsiReceiver();
-        ~PsiReceiver();
+        // ~PsiReceiver();
         //初始化psiReceiver
         //commonSeed,localSeed 长度为16字节
         int init(u8_t *commonSeed, u64_t receiverSize, u64_t senderSize,

@@ -3,13 +3,6 @@ from Cython.Build import cythonize
 from distutils.core import setup, Extension
 from Cython.Distutils import build_ext
 import os
-# train_dir = '/mnt/d/ubuntu/pyproject'
-# train_dir = '../../cproject/tool/libOTe/cryptoTools/cryptoTools/Common/'
-# datanames = os.listdir(train_dir)
-# print("===ls:", datanames)
-# for dataname in datanames:
-#     if os.path.splitext(dataname)[1] == '.cpp':  # 目录下包含.cpp 的文件
-#         print(dataname)
 
 
 def get_source_files(src_dir, str_fix='.cpp'):
@@ -36,7 +29,7 @@ CRYPTO_INCLUDE = '../../libOTe/cryptoTools'
 BLAKE2_DIR = '../../libOTe/cryptoTools/cryptoTools/Crypto/blake2'
 # 用源文件编译
 src_ot = get_source_files("../ot")
-source_files = ["psi.pyx"]
+source_files = ["oprf_psi.pyx"]
 source_files += src_ot
 
 src_miracl = get_source_files(THIRD_INCLUDE+"/miracl/miracl/source", '.c')
