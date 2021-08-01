@@ -31,7 +31,8 @@ fi
 #-DENABLE_MIRACL=ON \
 ################C++11##############
 BLAKE2_DIR=../../libOTe/cryptoTools/cryptoTools/Crypto/blake2
-g++ -g -std=c++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
+# g++ -g -std=c++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
+g++ -std=c++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
 -DENABLE_MIRACL \
 -I${CRYPTO_INCLUDE} -I${THIRD_INCLUDE}/miracl \
 -I${THIRD_INCLUDE}/miracl/miracl/include \
@@ -39,9 +40,9 @@ g++ -g -std=c++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
 -I../ot \
 ${THIRD_INCLUDE}/miracl/miracl/source/*.c \
 ${CRYPTO_INCLUDE}/cryptoTools/Common/*.cpp \
-${BLAKE2_DIR}/*c \
+${BLAKE2_DIR}/*.c \
 ${CRYPTO_INCLUDE}/cryptoTools/Crypto/*.cpp \
-../ot/*cpp \
+../ot/*.cpp \
 psi_main.cpp -o psi
 # -lpthread \
 # ################C++14##############3
