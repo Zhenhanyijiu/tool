@@ -15,4 +15,5 @@ namespace shapes
         void move(int dx, int dy);
     };
     void print_area(const char *msg);
+    void change(char** buf);
 }

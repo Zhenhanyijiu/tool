@@ -28,8 +28,9 @@ THIRD_INCLUDE = "../../libOTe/cryptoTools/thirdparty/linux"
 CRYPTO_INCLUDE = '../../libOTe/cryptoTools'
 BLAKE2_DIR = '../../libOTe/cryptoTools/cryptoTools/Crypto/blake2'
 # 用源文件编译
+source_files = []
+source_files += ["oprf_psi.pyx"]
 src_ot = get_source_files("../ot")
-source_files = ["oprf_psi.pyx"]
 source_files += src_ot
 
 src_miracl = get_source_files(THIRD_INCLUDE+"/miracl/miracl/source", '.c')
@@ -51,6 +52,7 @@ include_dirs.append(THIRD_INCLUDE+"/miracl")
 include_dirs.append(THIRD_INCLUDE+"/miracl/miracl/include")
 # 宏
 define_macros = [('ENABLE_MIRACL', None)]
+# -std=gnu++11,-std=c++11
 extra_compile_args = ['-std=c++11', '-Wall', '-O2',
                       '-msse3', '-msse2', '-msse4.1', '-maes', '-mpclmul']
 ext1 = Extension("oprf_psi",

@@ -29,6 +29,7 @@ namespace osuCrypto
         vector<vector<u8>> transHashInputs;
         vector<vector<u8>> hashInputs;
         IknpOtExtReceiver iknpOteReceiver;
+        vector<vector<u8>> senderSet;
         u64 lowL;
         // u64 upR;
 
@@ -83,7 +84,7 @@ namespace osuCrypto
         block commonSeed;
         vector<u8> sendMatrixADBuff;
         vector<vector<u8>> transHashInputs;
-        std::unordered_map<u64, std::vector<std::pair<block, u32>>> allHashes;
+        std::unordered_map<u64, std::vector<std::pair<block, u32_t>>> allHashes;
         IknpOtExtSender iknpOteSender;
         u64 lowL;
 

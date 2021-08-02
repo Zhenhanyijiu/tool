@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <cryptoTools/Crypto/RandomOracle.h>
+#include <cstdint>
 namespace osuCrypto
 {
     typedef struct TimeComputeType

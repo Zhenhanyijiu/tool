@@ -1,5 +1,7 @@
 #include "Rectangle.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 namespace shapes
 {
 
@@ -37,5 +39,11 @@ namespace shapes
     {
         printf("this is a print function:%s...\n", msg);
     }
-
+    void change(char **buf)
+    {
+        char *p = (char *)malloc(7);
+        char src[] = {48, 49, 50, 51, 52};
+        memcpy(p, src, 3);
+        *buf = p;
+    }
 }
