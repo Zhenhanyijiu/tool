@@ -63,7 +63,7 @@ cdef class OprfPsiSender:
         cdef u64_t pk0BufSize = len(pk0s)
         cdef u8_t *uBuffOutputTxorR
         cdef u64_t uBuffOutputSize
-        cdef int ret = self.psi_sender.genMatrixTxorRBuff(pk0Buf, pk0BufSize, uBuffOutputTxorR, uBuffOutputSize)
+        cdef int ret = self.psi_sender.genMatrixTxorRBuff(pk0Buf, pk0BufSize, &uBuffOutputTxorR, &uBuffOutputSize)
         if ret != 0:
             raise Exception('oprf psi sender generate matrix T_xor_R error')
         return uBuffOutputTxorR, uBuffOutputSize
