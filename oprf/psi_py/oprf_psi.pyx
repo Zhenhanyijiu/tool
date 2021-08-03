@@ -93,7 +93,7 @@ cdef class OprfPsiReceiver:
     #int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
     # vector[u32_t] *psiMsgIndex)
     def compute_psi_by_hash2_output(self, hash2_from_sender: bytearray):
-        cdef u8_t*recvBuff
+        cdef u8_t *recvBuff = hash2_from_sender
         cdef u64_t recvBufSize = len(hash2_from_sender)
         cdef int ret = self.psi_receiver.recvFromSenderAndComputePSIOnce(recvBuff, recvBufSize, &self.psi_msg_index)
         if ret != 0:
