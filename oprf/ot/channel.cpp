@@ -252,7 +252,7 @@ int send_data(void *channel, const char *buff, int buf_size)
     assert(n == 4);
     if (n != 4)
     {
-        printf("send header error,n(%d)\n", n);
+        printf("send header error,n(%ld)\n", n);
         return -121;
     }
     int offset = 0;

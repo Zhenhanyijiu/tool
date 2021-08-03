@@ -5,6 +5,7 @@
 from libcpp.vector cimport vector
 from libc cimport string
 from libc.stdio cimport printf
+import numpy as np
 cdef extern from "tmp.h":
     ctypedef unsigned char uchar
 cdef extern from "Rectangle.h" namespace "shapes":
@@ -63,6 +64,15 @@ def test_vector(ba:bytearray,n:int):
     # string.memcpy(bb,aa,5)
     print(by,len(aa),aa[:6],aa)
     by=aa
+    lst=np.array(['11144','222'])
+    print("vvlen:",vv.size())
+    cdef vector[vector[u8]] vvt
+    vvt.resize(3)
+    ll=lst[0].encode('utf-8')
+    vvt[0]=ll
+    print('ll:',ll)
+    print("vvt[0]len:",len(vvt[0]),vvt[0].size())
+    # cdef char** lt=lst
 
 
     
