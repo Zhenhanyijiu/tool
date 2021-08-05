@@ -99,12 +99,12 @@ class Client(object):
 
 
 def parse_args(argv):
-    psi_size, sender_size, receiver_size = 50, 200, 200
+    psi_size, sender_size, receiver_size, ip, port = 50, 200, 200, '127.0.0.1', 8888
     if len(argv[1:]) == 0:
         print('test.py --rs <500> --ss <500> --ps <100>')
         sys.exit(2)
     try:
-        opts, args = getopt.getopt(argv[1:], None, ["rs=", "ss=", "ps=", "help="])
+        opts, args = getopt.getopt(argv[1:], None, ["rs=", "ss=", "ps=", "ip=", "port=", "help="])
     except getopt.GetoptError:
         print('test.py --rs <500> --ss <500> --ps <100>')
         sys.exit(2)
@@ -118,14 +118,18 @@ def parse_args(argv):
             sender_size = int(arg)
         if opt in ('--ps'):
             psi_size = int(arg)
-    return receiver_size, sender_size, psi_size
+        if opt in ('--ip'):
+            ip = arg
+        if opt in ('--port'):
+            port = int(arg)
+    return receiver_size, sender_size, psi_size, ip, port
 
 
 if __name__ == "__main__":
-    receiver_size, sender_size, psi_size = parse_args(sys.argv)
-    print('receiver_size, sender_size, psi_size=', receiver_size, sender_size, psi_size)
+    receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
+    print('receiver_size, sender_size, psi_size, ip, port=', receiver_size, sender_size, psi_size, ip, port)
     print("===================")
-    client = Client('127.0.0.1', 8888)
+    client = Client(ip, port)
     sender_set = client.test_gen_data_set(sender_size, psi_size)
     # 1. 双方首先协商的公共种子
     common_seed = b'1111111111111112'  # bytearray(b'1111111111111112')
