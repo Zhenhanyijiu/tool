@@ -5,7 +5,7 @@
 #include <cryptoTools/Crypto/RCurve.h>
 #include <cryptoTools/Crypto/Curve.h>
 #include <cryptoTools/Common/BitVector.h>
-#define ENABLE_MIRACL
+// #define ENABLE_MIRACL
 #if defined ENABLE_RELIC || defined ENABLE_MIRACL
 #define NAOR_PINKAS
 using namespace std;

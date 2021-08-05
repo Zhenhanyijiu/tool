@@ -1,0 +1,1 @@
+time python3 psi_sender.py --rs 10000000 --ss 10000000 --ps 200000
