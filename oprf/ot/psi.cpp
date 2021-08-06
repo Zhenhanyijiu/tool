@@ -5,30 +5,45 @@
 #include <cstdint>
 namespace osuCrypto
 {
-    typedef struct TimeComputeType
+    // typedef struct TimeComputeType
+    // {
+    //     struct timeval start;
+    //     struct timeval end;
+    // } TimeCompute;
+    // void *newTimeCompute()
+    // {
+    //     return malloc(sizeof(TimeCompute));
+    // }
+    // void startTime(void *tc)
+    // {
+    //     assert(tc != nullptr);
+    //     TimeCompute *t = (TimeCompute *)tc;
+    //     gettimeofday(&(t->start), NULL);
+    // }
+    // //毫秒
+    // long int getEndTime(void *tc)
+    // {
+    //     assert(tc != nullptr);
+    //     TimeCompute *t = (TimeCompute *)tc;
+    //     gettimeofday(&(t->end), NULL);
+    //     long int time_use = (t->end.tv_sec - t->start.tv_sec) * 1000000 +
+    //                         (t->end.tv_usec - t->start.tv_usec);
+    //     return time_use / 1000;
+    // }
+
+    //时间统计us
+    long start_time()
     {
         struct timeval start;
+        gettimeofday(&start, NULL);
+        return start.tv_sec * 1000000 + start.tv_usec;
+    }
+    long get_use_time(long start_time)
+    {
         struct timeval end;
-    } TimeCompute;
-    void *newTimeCompute()
-    {
-        return malloc(sizeof(TimeCompute));
-    }
-    void startTime(void *tc)
-    {
-        assert(tc != nullptr);
-        TimeCompute *t = (TimeCompute *)tc;
-        gettimeofday(&(t->start), NULL);
-    }
-    //毫秒
-    long int getEndTime(void *tc)
-    {
-        assert(tc != nullptr);
-        TimeCompute *t = (TimeCompute *)tc;
-        gettimeofday(&(t->end), NULL);
-        long int time_use = (t->end.tv_sec - t->start.tv_sec) * 1000000 +
-                            (t->end.tv_usec - t->start.tv_usec);
-        return time_use / 1000;
+        gettimeofday(&end, NULL);
+        long usetime = end.tv_sec * 1000000 + end.tv_usec - start_time;
+        return usetime / 1000;
     }
     //common function
     //将所有输入的数据以相同的方式H1做映射，以dataSetOutput返回
@@ -97,6 +112,7 @@ namespace osuCrypto
         // block localSeedBlock = toBlock((u8 *)localSeed);
         PRNG localRng(this->commonSeed);
         this->lowL = (u64)0;
+        printf("===>>hash2LengthInBytes:%ld,bucket2ForComputeH2Output:%ld\n", hash2LengthInBytes, bucket2ForComputeH2Output);
         return this->iknpOteSender.init(localRng);
     }
     int PsiReceiver::genPK0FromNpot(u8_t *pubParamBuf, const u64_t pubParamBufByteSize,
@@ -155,11 +171,12 @@ namespace osuCrypto
         commonPrng.get((u8 *)&commonKey, sizeof(block));
         commonAes.setKey(commonKey);
         block *recvSet = new block[receiverSize];
-        void *timeCompute = newTimeCompute();
-        startTime(timeCompute);
+        // void *timeCompute = newTimeCompute();
+        // startTime(timeCompute);
+        long start0 = start_time();
         transformInputByH1(commonAes, this->h1LengthInBytes, receiverSet, recvSet);
-        long useTimeH1 = getEndTime(timeCompute);
-        printf("===>>计算H1用时:%ld\n", useTimeH1);
+        // long useTimeH1 = getEndTime(timeCompute);
+        printf("===>>计算H1用时:%ldms\n", get_use_time(start0));
         ////////// Transform input end //////////////////
         /*********for cycle start*********/
         for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
@@ -241,8 +258,8 @@ namespace osuCrypto
                 }
             }
         }
-        long useTimeCycle = getEndTime(timeCompute);
-        printf("===>>计算H1之后,生成矩阵A,D用时:%ld\n", useTimeCycle - useTimeH1);
+        // long useTimeCycle = getEndTime(timeCompute);
+        printf("===>>计算H1之后,生成矩阵A,D用时:%ldms\n", get_use_time(start0));
         /*********for cycle end*********/
         //将uBuff输出并发送给对方
         *sendMatrixADBuff = this->sendMatrixADBuff.data();
@@ -363,7 +380,7 @@ namespace osuCrypto
         //初始化一个向量r，长度为width
         this->choicesWidthInput.resize(matrixWidth);
         this->choicesWidthInput.randomize(localRng);
-        this->hashOutputBuff.resize(this->hash2LengthInBytes * this->bucket2ForComputeH2Output);
+        // this->hashOutputBuff.resize(this->hash2LengthInBytes * this->bucket2ForComputeH2Output);
         this->hashInputs.resize(this->bucket2ForComputeH2Output);
         for (int i = 0; i < this->bucket2ForComputeH2Output; i++)
         {
@@ -522,7 +539,7 @@ namespace osuCrypto
         return this->lowL < this->senderSize ? 0 : 1;
     }
     //计算本方的hash输出并发送给对方
-    int PsiSender::computeHashOutputToReceiverOnce(u8_t **sendBuff, u64_t *sendBuffSize)
+    int PsiSender::computeHashOutputToReceiverOnce(u8_t *hashOutputBuff, u64_t *sendBuffSize)
     {
         auto upR = this->lowL + this->bucket2ForComputeH2Output < this->senderSize ? this->lowL + this->bucket2ForComputeH2Output : this->senderSize;
         //H2
@@ -546,11 +563,11 @@ namespace osuCrypto
             H.Reset();
             H.Update(this->hashInputs[j - this->lowL].data(), this->matrixWidthInBytes);
             H.Final(hashOutput);
-            memcpy(this->hashOutputBuff.data() + (j - this->lowL) * this->hash2LengthInBytes,
+            memcpy(hashOutputBuff + (j - this->lowL) * this->hash2LengthInBytes,
                    hashOutput, this->hash2LengthInBytes);
         }
         *sendBuffSize = (upR - this->lowL) * this->hash2LengthInBytes;
-        *sendBuff = this->hashOutputBuff.data();
+        // *sendBuff = this->hashOutputBuff.data();
         this->lowL += this->bucket2ForComputeH2Output;
         return 0;
     }

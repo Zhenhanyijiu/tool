@@ -25,7 +25,7 @@ namespace osuCrypto
         BitVector choicesWidthInput;
         vector<block> recoverMsgWidthOutput;
         vector<block> uBuffOutput;
-        vector<u8> hashOutputBuff;
+        // vector<u8> hashOutputBuff;
         vector<vector<u8>> transHashInputs;
         vector<vector<u8>> hashInputs;
         IknpOtExtReceiver iknpOteReceiver;
@@ -61,7 +61,8 @@ namespace osuCrypto
         */
         // int computeHashOutputToReceiverOnce(const u64_t low, const u64_t up,
         // u8_t **sendBuff, u64_t *sendBuffSize);
-        int computeHashOutputToReceiverOnce(u8_t **sendBuff, u64_t *sendBuffSize);
+        //hashOutputBuff外部开辟空间，大小为10*bucket2ForComputeH2Output
+        int computeHashOutputToReceiverOnce(u8_t *hashOutputBuff, u64_t *sendBuffSize);
     };
     //psi 接收方结构定义如下
     class PsiReceiver

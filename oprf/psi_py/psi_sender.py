@@ -92,8 +92,10 @@ class Client(object):
     def test_gen_data_set(self, n: int, psi_size: int = 200000) -> np.array:
         ls = [''] * n
         for i in range(0, psi_size):
+            # ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21].encode('utf-8')
             ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21]
         for i in range(psi_size, n):
+            # ls[i] = sha256((str(i) + "xx").encode('utf-8')).hexdigest()[:21].encode('utf-8')
             ls[i] = sha256((str(i) + "xx").encode('utf-8')).hexdigest()[:21]
         return np.array(ls)
 

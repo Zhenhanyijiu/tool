@@ -1,9 +1,8 @@
 import socket
-import sys
 from oprf_psi import OprfPsiReceiver
 import numpy as np
 from hashlib import sha256
-import sys, getopt
+import sys, getopt, time
 
 
 class Receiver(object):
@@ -95,8 +94,9 @@ class Server(object):
             raise Exception('length error')
 
     def test_gen_data_set(self, n: int, psi_size: int = 200000) -> np.array:
-        ls = [''] * n
+        ls = [b''] * n
         for i in range(0, n):
+            # ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21].encode('utf-8')
             ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21]
         return np.array(ls)
 
@@ -128,15 +128,23 @@ def parse_args(argv):
     return receiver_size, sender_size, psi_size, ip, port
 
 
+def get_use_time(start: int) -> float:
+    return (time.time_ns() - start) / 1e6
+
+
 if __name__ == '__main__':
     receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
     print('receiver_size, sender_size, psi_size, ip, port=', receiver_size, sender_size, psi_size, ip, port)
     print("===================")
     server = Server(ip, port)
+    start0 = time.time_ns()
     receiver_set = server.test_gen_data_set(receiver_size, psi_size)
+    print("===>>生成测试数据用时：{}ms".format(get_use_time(start0)))
     # 1. 双方首先协商的公共种子
-    common_seed = b'1111111111111112'  # bytearray(b'1111111111111112')
+    common_seed = b'1111111111111112'
+    # bytearray(b'1111111111111112')
     # 2. 创建接收方对象
+    start1 = time.time_ns()
     psi_recv = Receiver(common_seed, receiver_size, sender_size)
 
     # 3. 接收对方发来的公共参数public_param
@@ -149,17 +157,26 @@ if __name__ == '__main__':
     matrix_TxorR = server.recv_data()
     # print('===>>matrix_TxorR:', matrix_TxorR, len(matrix_TxorR))
     # 7.生成矩阵matrix_A_xor_D
+    start2 = time.time_ns()
     matrix_A_xor_D, _ = psi_recv.gen_matrix_A_xor_D(matrix_TxorR, receiver_set)
+    print("===>>生成matrix_A_xor_D用时：{}ms".format(get_use_time(start2)))
     # 8.发送矩阵matrix_A_xor_D给对方
     server.send_data(matrix_A_xor_D)
     # 9.生成本方数据的所有hash2_output_map,本接口没有输出
+    start3 = time.time_ns()
     psi_recv.gen_all_hash2_map()
+    print("===>>生成hash2 map用时：{}ms".format(get_use_time(start3)))
     # 10.循环接收数据，并匹配交集数据
+    start4 = time.time_ns()
+    count_debug = 0
     while psi_recv.is_receiver_end() == False:
         hash2_output_val = server.recv_data()
         psi_recv.compute_psi_by_hash2_output(hash2_output_val)
+        count_debug += 1
+    print("===>>匹配用时：{}ms,循环次数：{}".format(get_use_time(start4), count_debug))
+    print("===>>recv总用时：{}ms".format(get_use_time(start1)))
+    print('交集最后一个元素：', psi_recv.psi_msg_index[-1])
     print('===>>接收方求交结束...')
-    print('交集：', psi_recv.psi_msg_index[-1])
     assert psi_size == (psi_recv.psi_msg_index[-1] + 1)
     # psi_recv.gen_matrix_A_xor_D()
     pass

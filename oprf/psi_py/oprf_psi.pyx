@@ -2,6 +2,7 @@ from libcpp.vector cimport vector
 from libc cimport string
 from libc.stdio cimport printf
 import numpy as np
+import time
 # cdef extern from "Python.h":
 #     ctypedef struct PyObject:
 #         pass
@@ -20,7 +21,7 @@ cdef extern from "psi.h" namespace "osuCrypto":
         int recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize,
                            const vector[vector[u8_t]] senderSet)
         int isSendEnd()
-        int computeHashOutputToReceiverOnce(u8_t ** sendBuff, u64_t *sendBuffSize)
+        int computeHashOutputToReceiverOnce(u8_t *sendBuff, u64_t *sendBuffSize)
 
     cdef cppclass PsiReceiver:
         PsiReceiver()except+
@@ -66,17 +67,26 @@ cdef class OprfPsiReceiver:
         cdef u64_t uBuffInputSize = len(matrix_TxorR)
         cdef u8_t *matrix_AxorD_buff
         cdef u64_t matrix_AxorD_buff_size
+        start = time.time_ns()
+        # cdef vector[vector[u8_t]] receiverSet = <vector[vector[u8_t]]> receiver_set
         cdef vector[vector[u8_t]] receiverSet
         recv_size = len(receiver_set)
         receiverSet.resize(recv_size)
         for i, v in enumerate(receiver_set):
+            # receiverSet[i] = <vector[u8_t]> receiver_set[i]  #.encode('utf-8')
             receiverSet[i] = receiver_set[i].encode('utf-8')
+
+        end = time.time_ns()
+        print('===>>循环赋值recvset用时:{}ms'.format((end - start) / 1e6))
         cdef int ret = self.psi_receiver.getSendMatrixADBuff(matrix_TxorR, uBuffInputSize, receiverSet,
                                                              &matrix_AxorD_buff, &matrix_AxorD_buff_size)
         if ret != 0:
             raise Exception('oprf psi receiver: generate matrix A_xor_D error')
         matrix_AxorD_val = bytes(matrix_AxorD_buff_size)
+        start = time.time_ns()
         string.memcpy(<u8_t*> matrix_AxorD_val, matrix_AxorD_buff, matrix_AxorD_buff_size)
+        end = time.time_ns()
+        print('===>>matrix_AxorD_val copy用时:{}ms'.format((end - start) / 1e6))
         return matrix_AxorD_val, matrix_AxorD_buff_size
 
     def gen_all_hash2_map(self):
@@ -146,10 +156,12 @@ cdef class OprfPsiSender(object):
     def recover_matrix_C(self, recv_matrix_A_xor_D: bytes, sender_set: np.array):
         # cdef u8_t *recvMatrixADBuff = recv_matrix_A_xor_D
         cdef u64_t recvMatixADBuffSize = len(recv_matrix_A_xor_D)
+        # cdef vector[vector[u8_t]] senderSet = <vector[vector[u8_t]]> sender_set
         cdef vector[vector[u8_t]] senderSet
         sender_size = len(sender_set)
         senderSet.resize(sender_size)
         for i, v in enumerate(sender_set):
+            # senderSet[i] = <vector[u8_t]> sender_set[i]  #.encode('utf-8')
             senderSet[i] = sender_set[i].encode('utf-8')
         cdef int ret = self.psi_sender.recoverMatrixC(recv_matrix_A_xor_D, recvMatixADBuffSize, senderSet)
         if ret != 0:
@@ -162,12 +174,13 @@ cdef class OprfPsiSender(object):
         return False
 
     def compute_hash2_output_to_receiver(self):
-        cdef u8_t *hash2_output_buff
+        hash2_output_val = bytes(102400)
+        cdef u8_t *hash2_output_buff = hash2_output_val
         cdef u64_t hash2_output_buff_size
-        cdef int ret = self.psi_sender.computeHashOutputToReceiverOnce(&hash2_output_buff, &hash2_output_buff_size)
+        cdef int ret = self.psi_sender.computeHashOutputToReceiverOnce(hash2_output_buff, &hash2_output_buff_size)
         if ret != 0:
             raise Exception('oprf psi sender: compute hash2 output error')
-        hash2_output_val = bytes(hash2_output_buff_size)
-        string.memcpy(<u8_t*> hash2_output_val, hash2_output_buff, hash2_output_buff_size)
+        # hash2_output_val = bytes(hash2_output_buff_size)
+        # string.memcpy(<u8_t*> hash2_output_val, hash2_output_buff, hash2_output_buff_size)
 
-        return hash2_output_val, hash2_output_buff_size
+        return hash2_output_buff[:hash2_output_buff_size], hash2_output_buff_size
