@@ -5,31 +5,45 @@
 #include <cstdint>
 namespace osuCrypto
 {
-    // typedef struct TimeComputeType
-    // {
-    //     struct timeval start;
-    //     struct timeval end;
-    // } TimeCompute;
-    // void *newTimeCompute()
-    // {
-    //     return malloc(sizeof(TimeCompute));
-    // }
-    // void startTime(void *tc)
-    // {
-    //     assert(tc != nullptr);
-    //     TimeCompute *t = (TimeCompute *)tc;
-    //     gettimeofday(&(t->start), NULL);
-    // }
-    // //毫秒
-    // long int getEndTime(void *tc)
-    // {
-    //     assert(tc != nullptr);
-    //     TimeCompute *t = (TimeCompute *)tc;
-    //     gettimeofday(&(t->end), NULL);
-    //     long int time_use = (t->end.tv_sec - t->start.tv_sec) * 1000000 +
-    //                         (t->end.tv_usec - t->start.tv_usec);
-    //     return time_use / 1000;
-    // }
+    //debug function
+    void generateDataSetDebug(const int ptype, const u64_t dataSize, const u64_t psiSize,
+                              u64_t seed, u64_t ids, vector<vector<u8_t>> *dataSet)
+    {
+        oc::PRNG prng(toBlock(0x77887788 + seed));
+        //sender
+        // oc::u64 psiSize = Psi_Size;
+        // dataSet->resize(dataSize);
+        assert(dataSize >= psiSize);
+        if (ptype == 0)
+        {
+            u64 i = 0;
+            for (; i < psiSize; i++)
+            {
+                (*dataSet)[i].resize(ids);
+                prng.get((u8 *)((*dataSet)[i].data()), (u64)ids);
+            }
+            prng.SetSeed(toBlock(0x998877 + seed));
+            for (; i < dataSize; i++)
+            {
+                (*dataSet)[i].resize(ids);
+                // dataSet[i] = prng.get<oc::block>();
+                prng.get((u8 *)((*dataSet)[i].data()), ids);
+            }
+        }
+        printf("=========>>>>>>>>>>ids:%ld\n", ids);
+        //receiver
+        if (ptype == 1)
+        {
+            for (u64 i = 0; i < dataSize; i++)
+            {
+                (*dataSet)[i].resize(ids);
+                // dataSet[i] = prng.get<oc::block>();
+                prng.get((u8 *)((*dataSet)[i].data()), ids);
+                // printf("=========>>>>22>>>>>>ids:%ld,size:%ld\n", ids, (*dataSet).size());
+            }
+        }
+        printf("===>>id length:%ld\n", (*dataSet)[0].size());
+    }
 
     //时间统计us
     long start_time()

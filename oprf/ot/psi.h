@@ -121,4 +121,6 @@ namespace osuCrypto
         int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
                                             vector<u32_t> *psiMsgIndex);
     };
+    void generateDataSetDebug(const int ptype, const u64_t dataSize, const u64_t psiSize,
+                              u64_t seed, u64_t ids, vector<vector<u8_t>> *dataSet);
 }

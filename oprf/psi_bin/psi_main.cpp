@@ -21,38 +21,7 @@
 namespace oc = osuCrypto;
 
 using namespace std;
-// typedef struct TimeComputeType
-// {
-//     struct timeval start;
-//     struct timeval end;
-// } TimeCompute;
-// void *newTimeCompute()
-// {
-//     return malloc(sizeof(TimeCompute));
-// }
-// void startTime(void *tc)
-// {
-//     assert(tc != nullptr);
-//     TimeCompute *t = (TimeCompute *)tc;
-//     gettimeofday(&(t->start), NULL);
-// }
-// //毫秒
-// long int getEndTime(void *tc)
-// {
-//     assert(tc != nullptr);
-//     TimeCompute *t = (TimeCompute *)tc;
-//     gettimeofday(&(t->end), NULL);
-//     long int time_use = (t->end.tv_sec - t->start.tv_sec) * 1000000 +
-//                         (t->end.tv_usec - t->start.tv_usec);
-//     return time_use / 1000;
-// }
-// void releaseTimeCompute(void *tc)
-// {
-//     if (tc)
-//     {
-//         free(tc);
-//     }
-// }
+
 //时间统计us
 long start_time()
 {
@@ -329,11 +298,11 @@ int main(int argc, char **argv)
     {
         //生成sendSet
         long start0 = start_time();
-        vector<vector<oc::u8>> sendSet;
+        vector<vector<oc::u8_t>> sendSet;
         sendSet.resize(senderSize);
         if (inFile == "")
         {
-            generateDataSet(0, senderSize, seed, ids, sendSet);
+            oc::generateDataSetDebug(0, senderSize, Psi_Size, seed, ids, &sendSet);
         }
         else
         {
@@ -409,12 +378,13 @@ int main(int argc, char **argv)
     {
         //生成recvSet
         long start0 = start_time();
-        vector<vector<oc::u8>> recvSet;
+        vector<vector<oc::u8_t>> recvSet;
         recvSet.resize(receiverSize);
         // generateDataSet(1, receiverSize, seed, recvSet);
         if (inFile == "")
         {
-            generateDataSet(1, receiverSize, seed, ids, recvSet);
+            // generateDataSet(1, receiverSize, seed, ids, recvSet);
+            oc::generateDataSetDebug(1, receiverSize, Psi_Size, seed, ids, &recvSet);
         }
         else
         {

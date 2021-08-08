@@ -1,9 +1,10 @@
+from oprf_psi import OprfPsiSender, generate_dataset_debug
+import numpy as np
 import socket
 import sys
-from oprf_psi import OprfPsiSender
-import numpy as np
 from hashlib import sha256
-import sys, getopt
+import sys
+import getopt
 
 
 class Sender(object):
@@ -92,12 +93,18 @@ class Client(object):
     def test_gen_data_set(self, n: int, psi_size: int = 200000) -> np.array:
         ls = [''] * n
         for i in range(0, psi_size):
-            # ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21].encode('utf-8')
-            ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21]
+            ls[i] = sha256(str(i).encode('utf-8')
+                           ).hexdigest()[:21].encode('utf-8')
+            # ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21]
         for i in range(psi_size, n):
-            # ls[i] = sha256((str(i) + "xx").encode('utf-8')).hexdigest()[:21].encode('utf-8')
-            ls[i] = sha256((str(i) + "xx").encode('utf-8')).hexdigest()[:21]
+            ls[i] = sha256((str(i) + "xx").encode('utf-8')
+                           ).hexdigest()[:21].encode('utf-8')
+            # ls[i] = sha256((str(i) + "xx").encode('utf-8')).hexdigest()[:21]
         return np.array(ls)
+
+    def generate_dataset_debug(self, dataSize: int, psiSize: int = 200000,
+                               seed: int = 11, ids: int = 21):
+        return generate_dataset_debug(1, dataSize, psiSize, seed, ids)
 
 
 def parse_args(argv):
@@ -106,7 +113,8 @@ def parse_args(argv):
         print('test.py --rs <500> --ss <500> --ps <100>')
         sys.exit(2)
     try:
-        opts, args = getopt.getopt(argv[1:], None, ["rs=", "ss=", "ps=", "ip=", "port=", "help="])
+        opts, args = getopt.getopt(
+            argv[1:], None, ["rs=", "ss=", "ps=", "ip=", "port=", "help="])
     except getopt.GetoptError:
         print('test.py --rs <500> --ss <500> --ps <100>')
         sys.exit(2)
@@ -129,10 +137,12 @@ def parse_args(argv):
 
 if __name__ == "__main__":
     receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
-    print('receiver_size, sender_size, psi_size, ip, port=', receiver_size, sender_size, psi_size, ip, port)
+    print('receiver_size, sender_size, psi_size, ip, port=',
+          receiver_size, sender_size, psi_size, ip, port)
     print("===================")
     client = Client(ip, port)
-    sender_set = client.test_gen_data_set(sender_size, psi_size)
+    # sender_set = client.test_gen_data_set(sender_size, psi_size)
+    sender_set = client.generate_dataset_debug(sender_size, psi_size)
     # 1. 双方首先协商的公共种子
     common_seed = b'1111111111111112'  # bytearray(b'1111111111111112')
     # 2. 创建接收方对象

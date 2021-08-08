@@ -1,8 +1,12 @@
-import socket
 from oprf_psi import OprfPsiReceiver
+from oprf_psi import generate_dataset_debug
 import numpy as np
 from hashlib import sha256
-import sys, getopt, time
+import sys
+import getopt
+import time
+import socket
+from Crypto.Cipher import AES
 
 
 class Receiver(object):
@@ -10,7 +14,8 @@ class Receiver(object):
         self.psi_msg_index = list()
         self.receiver_size = receiver_size
         self.sender_size = sender_size
-        self.PsiReceiver = OprfPsiReceiver(common_deed, receiver_size, sender_size, matrix_width)
+        self.PsiReceiver = OprfPsiReceiver(
+            common_deed, receiver_size, sender_size, matrix_width)
 
     def gen_pk0s(self, public_param: bytes):
         return self.PsiReceiver.gen_pk0s(public_param)
@@ -28,7 +33,8 @@ class Receiver(object):
         return self.PsiReceiver.is_receiver_end()
 
     def compute_psi_by_hash2_output(self, hash2_from_sender: bytes):
-        psi_index = self.PsiReceiver.compute_psi_by_hash2_output(hash2_from_sender)
+        psi_index = self.PsiReceiver.compute_psi_by_hash2_output(
+            hash2_from_sender)
         self.psi_msg_index += psi_index
 
 
@@ -96,9 +102,14 @@ class Server(object):
     def test_gen_data_set(self, n: int, psi_size: int = 200000) -> np.array:
         ls = [b''] * n
         for i in range(0, n):
-            # ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21].encode('utf-8')
-            ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21]
+            ls[i] = sha256(str(i).encode('utf-8')
+                           ).hexdigest()[:21].encode('utf-8')
+            # ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21]
         return np.array(ls)
+
+    def generate_dataset_debug(self, dataSize: int, psiSize: int = 200000,
+                               seed: int = 11, ids: int = 21):
+        return generate_dataset_debug(0, dataSize, psiSize, seed, ids)
 
 
 def parse_args(argv):
@@ -107,7 +118,8 @@ def parse_args(argv):
         print('test.py --rs <500> --ss <500> --ps <100>')
         sys.exit(2)
     try:
-        opts, args = getopt.getopt(argv[1:], None, ["rs=", "ss=", "ps=", "ip=", "port=", "help="])
+        opts, args = getopt.getopt(
+            argv[1:], None, ["rs=", "ss=", "ps=", "ip=", "port=", "help="])
     except getopt.GetoptError:
         print('test.py --rs <500> --ss <500> --ps <100>')
         sys.exit(2)
@@ -134,11 +146,13 @@ def get_use_time(start: int) -> float:
 
 if __name__ == '__main__':
     receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
-    print('receiver_size, sender_size, psi_size, ip, port=', receiver_size, sender_size, psi_size, ip, port)
+    print('receiver_size, sender_size, psi_size, ip, port=',
+          receiver_size, sender_size, psi_size, ip, port)
     print("===================")
     server = Server(ip, port)
     start0 = time.time_ns()
-    receiver_set = server.test_gen_data_set(receiver_size, psi_size)
+    # receiver_set = server.test_gen_data_set(receiver_size, psi_size)
+    receiver_set = server.generate_dataset_debug(receiver_size, psi_size)
     print("===>>生成测试数据用时：{}ms".format(get_use_time(start0)))
     # 1. 双方首先协商的公共种子
     common_seed = b'1111111111111112'
