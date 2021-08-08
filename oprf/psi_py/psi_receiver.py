@@ -1,7 +1,6 @@
 from oprf_psi import OprfPsiReceiver
-from oprf_psi import generate_dataset_debug
 import numpy as np
-from hashlib import sha256
+from hashlib import sha256, md5
 import sys
 import getopt
 import time
@@ -102,14 +101,9 @@ class Server(object):
     def test_gen_data_set(self, n: int, psi_size: int = 200000) -> np.array:
         ls = [b''] * n
         for i in range(0, n):
-            ls[i] = sha256(str(i).encode('utf-8')
-                           ).hexdigest()[:21].encode('utf-8')
-            # ls[i] = sha256(str(i).encode('utf-8')).hexdigest()[:21]
-        return np.array(ls)
+            ls[i] = md5(str(i).encode('utf-8')).hexdigest()[:21]
 
-    def generate_dataset_debug(self, dataSize: int, psiSize: int = 200000,
-                               seed: int = 11, ids: int = 21):
-        return generate_dataset_debug(0, dataSize, psiSize, seed, ids)
+        return np.array(ls)
 
 
 def parse_args(argv):
@@ -151,8 +145,8 @@ if __name__ == '__main__':
     print("===================")
     server = Server(ip, port)
     start0 = time.time_ns()
-    # receiver_set = server.test_gen_data_set(receiver_size, psi_size)
-    receiver_set = server.generate_dataset_debug(receiver_size, psi_size)
+    receiver_set = server.test_gen_data_set(receiver_size, psi_size)
+
     print("===>>生成测试数据用时：{}ms".format(get_use_time(start0)))
     # 1. 双方首先协商的公共种子
     common_seed = b'1111111111111112'

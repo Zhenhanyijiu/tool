@@ -119,6 +119,46 @@ void generateDataSet(const int ptype, const oc::u64 dataSize,
     }
     printf("===>>id length:%ld\n", dataSet[0].size());
 }
+// //debug function
+// void generateDataSetDebug(const int ptype, const u64_t dataSize, const u64_t psiSize,
+//                           u64_t seed, u64_t ids, vector<vector<u8_t>> *dataSet)
+// {
+//     oc::PRNG prng(toBlock(0x77887788 + seed));
+//     //sender
+//     // oc::u64 psiSize = Psi_Size;
+//     dataSet->resize(dataSize);
+//     assert(dataSize >= psiSize);
+//     if (ptype == 0)
+//     {
+//         u64 i = 0;
+//         for (; i < psiSize; i++)
+//         {
+//             (*dataSet)[i].resize(ids);
+//             prng.get((u8 *)((*dataSet)[i].data()), (u64)ids);
+//         }
+//         prng.SetSeed(toBlock(0x998877 + seed));
+//         for (; i < dataSize; i++)
+//         {
+//             (*dataSet)[i].resize(ids);
+//             // dataSet[i] = prng.get<oc::block>();
+//             prng.get((u8 *)((*dataSet)[i].data()), ids);
+//         }
+//     }
+//     printf("=========>>>>>>>>>>ids:%ld\n", ids);
+//     //receiver
+//     if (ptype == 1)
+//     {
+//         for (u64 i = 0; i < dataSize; i++)
+//         {
+//             (*dataSet)[i].resize(ids);
+//             // dataSet[i] = prng.get<oc::block>();
+//             prng.get((u8 *)((*dataSet)[i].data()), ids);
+//             // printf("=========>>>>22>>>>>>ids:%ld,size:%ld\n", ids, (*dataSet).size());
+//         }
+//     }
+//     printf("===>>id length:%ld\n", (*dataSet)[0].size());
+// }
+
 //write file
 void writeFileAllByCPP(const char *fileName, const char *buf, long bufSize)
 {
@@ -299,10 +339,11 @@ int main(int argc, char **argv)
         //生成sendSet
         long start0 = start_time();
         vector<vector<oc::u8_t>> sendSet;
-        sendSet.resize(senderSize);
+        // sendSet.resize(senderSize);
         if (inFile == "")
         {
-            oc::generateDataSetDebug(0, senderSize, Psi_Size, seed, ids, &sendSet);
+            // oc::generateDataSetDebug(0, senderSize, Psi_Size, seed, ids, &sendSet);
+            generateDataSet(0, senderSize, seed, ids, sendSet);
         }
         else
         {
@@ -379,12 +420,12 @@ int main(int argc, char **argv)
         //生成recvSet
         long start0 = start_time();
         vector<vector<oc::u8_t>> recvSet;
-        recvSet.resize(receiverSize);
+        // recvSet.resize(receiverSize);
         // generateDataSet(1, receiverSize, seed, recvSet);
         if (inFile == "")
         {
-            // generateDataSet(1, receiverSize, seed, ids, recvSet);
-            oc::generateDataSetDebug(1, receiverSize, Psi_Size, seed, ids, &recvSet);
+            generateDataSet(1, receiverSize, seed, ids, recvSet);
+            // oc::generateDataSetDebug(1, receiverSize, Psi_Size, seed, ids, &recvSet);
         }
         else
         {

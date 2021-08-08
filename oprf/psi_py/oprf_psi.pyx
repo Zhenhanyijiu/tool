@@ -12,8 +12,6 @@ cdef extern from "psi.h" namespace "osuCrypto":
     ctypedef unsigned long int u64_t
     ctypedef unsigned char u8_t
     ctypedef unsigned int u32_t
-    void generateDataSetDebug(const int ptype, const u64_t dataSize, const u64_t psiSize,
-                              u64_t seed, u64_t ids, vector[vector[u8_t]] *dataSet)
     cdef cppclass PsiSender:
         PsiSender()except+
         int init(u8_t *commonSeed, u64_t senderSize, u64_t matrixWidth, u64_t logHeight,
@@ -41,17 +39,6 @@ cdef extern from "psi.h" namespace "osuCrypto":
         int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
                                             vector[u32_t] *psiMsgIndex)
 
-#Debug function
-def generate_dataset_debug(ptype: int, dataSize: int, psiSize: int,
-                           seed: int, ids: int):
-    start = time.time_ns()
-    cdef vector[vector[u8_t]] dataSet
-    dataSet.resize(dataSize)
-    print('1>>>>>>>>>>>>>>>>>>>>>>>')
-    generateDataSetDebug(ptype, dataSize, psiSize, seed, ids, &dataSet)
-    end = time.time_ns()
-    print('2>>>>>>>>>>>>>>>>>>>>>>>:{} ms'.format((end-start)/1e6))
-    return dataSet
 
 #Opef psi receiver
 cdef class OprfPsiReceiver:
@@ -75,22 +62,20 @@ cdef class OprfPsiReceiver:
         pk0s_val = bytes(pk0BufSize)
         string.memcpy(<u8_t*> pk0s_val, pk0s, pk0BufSize)
         return pk0s_val, pk0BufSize
-    # int getSendMatrixADBuff(const u8_t *uBuffInputTxorR, const u64_t uBuffInputSize,
-    #                                 const vector[vector[u8_t]] receiverSet,
-    #                                 u8_t ** sendMatrixADBuff, u64_t *sendMatixADBuffSize)
+
     def gen_matrix_A_xor_D(self, matrix_TxorR: bytes, receiver_set: np.array):
         # cdef u8_t *uBuffInputTxorR = matrix_TxorR
         cdef u64_t uBuffInputSize = len(matrix_TxorR)
         cdef u8_t *matrix_AxorD_buff
         cdef u64_t matrix_AxorD_buff_size
         start = time.time_ns()
-        cdef vector[vector[u8_t]] receiverSet = <vector[vector[u8_t]]> receiver_set
-        # cdef vector[vector[u8_t]] receiverSet
-        # recv_size = len(receiver_set)
-        # receiverSet.resize(recv_size)
-        # for i, v in enumerate(receiver_set):
-        #     # receiverSet[i] = <vector[u8_t]> receiver_set[i]  #.encode('utf-8')
-        #     receiverSet[i] = receiver_set[i].encode('utf-8')
+        # cdef vector[vector[u8_t]] receiverSet = <vector[vector[u8_t]]> receiver_set
+        cdef vector[vector[u8_t]] receiverSet
+        recv_size = len(receiver_set)
+        receiverSet.resize(recv_size)
+        for i, v in enumerate(receiver_set):
+            # receiverSet[i] = <vector[u8_t]> receiver_set[i]  #.encode('utf-8')
+            receiverSet[i] = receiver_set[i].encode('utf-8')
 
         end = time.time_ns()
         print('===>>循环赋值recvset用时:{}ms'.format((end - start) / 1e6))
@@ -117,8 +102,6 @@ cdef class OprfPsiReceiver:
             return True
         return False
 
-    #int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
-    # vector[u32_t] *psiMsgIndex)
     def compute_psi_by_hash2_output(self, hash2_from_sender: bytes)-> list:
         # cdef u8_t *recvBuff = hash2_from_sender
         cdef u64_t recvBufSize = len(hash2_from_sender)
@@ -127,11 +110,7 @@ cdef class OprfPsiReceiver:
         if ret != 0:
             raise Exception('oprf psi receiver: compute psi by hash2 output from sender error')
         return <list> psi_msg_index
-    # def get_psi_result_for_index(self)-> list:
-    #     psi_num = self.psi_msg_index.size()
-    #     result = <list> self.psi_msg_index
-    #     # for
-    #     return result
+
 
 #Oprf psi sender
 cdef class OprfPsiSender(object):
@@ -172,14 +151,14 @@ cdef class OprfPsiSender(object):
     def recover_matrix_C(self, recv_matrix_A_xor_D: bytes, sender_set: np.array):
         # cdef u8_t *recvMatrixADBuff = recv_matrix_A_xor_D
         cdef u64_t recvMatixADBuffSize = len(recv_matrix_A_xor_D)
-        cdef vector[vector[u8_t]] senderSet = <vector[vector[u8_t]]> sender_set
+        # cdef vector[vector[u8_t]] senderSet = <vector[vector[u8_t]]> sender_set
 
-        # cdef vector[vector[u8_t]] senderSet
-        # sender_size = len(sender_set)
-        # senderSet.resize(sender_size)
-        # for i, v in enumerate(sender_set):
-        #     # senderSet[i] = <vector[u8_t]> sender_set[i]  #.encode('utf-8')
-        #     senderSet[i] = sender_set[i].encode('utf-8')
+        cdef vector[vector[u8_t]] senderSet
+        sender_size = len(sender_set)
+        senderSet.resize(sender_size)
+        for i, v in enumerate(sender_set):
+            # senderSet[i] = <vector[u8_t]> sender_set[i]  #.encode('utf-8')
+            senderSet[i] = sender_set[i].encode('utf-8')
         cdef int ret = self.psi_sender.recoverMatrixC(recv_matrix_A_xor_D, recvMatixADBuffSize, senderSet)
         if ret != 0:
             raise Exception('oprf psi sender: recover matrix_C error')
