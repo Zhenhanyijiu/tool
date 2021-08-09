@@ -12,7 +12,7 @@ namespace osuCrypto
     {
         return this->npsender.init(rng, otMsgPairSize, otPerMsgBitSize);
     }
-    int IknpOtExtReceiver::genPublicParamFromNpot(u8 **pubParamBuf, u64 &pubParamBufByteSize)
+    int IknpOtExtReceiver::genPublicParamFromNpot(u8 **pubParamBuf, u64 *pubParamBufByteSize)
     {
         return this->npsender.genPublicParam(pubParamBuf, pubParamBufByteSize);
     }
@@ -228,7 +228,7 @@ namespace osuCrypto
         return this->npreceiver.init(rng, otMsgPairSize, otPerMsgBitSize);
     }
     int IknpOtExtSender::genPK0FromNpot(u8 *pubParamBuf, const u64 pubParamBufByteSize,
-                                        u8 **pk0Buf, u64 &pk0BufSize)
+                                        u8 **pk0Buf, u64 *pk0BufSize)
     {
         int fg = this->npreceiver.genPK0(pubParamBuf, pubParamBufByteSize,
                                          this->mBaseChoiceBits, pk0Buf, pk0BufSize);

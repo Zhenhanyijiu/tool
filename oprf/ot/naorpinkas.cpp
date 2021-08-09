@@ -45,7 +45,7 @@ namespace osuCrypto
         return 0;
     }
 
-    int NaorPinkasSender::genPublicParam(u8 **pubParamBuf, u64 &pubParamBufByteSize)
+    int NaorPinkasSender::genPublicParam(u8 **pubParamBuf, u64 *pubParamBufByteSize)
     {
         const Point g = this->curve.getGenerator();
         u64 fieldElementSize = g.sizeBytes();
@@ -68,7 +68,7 @@ namespace osuCrypto
             print_error(-1);
             return -1;
         }
-        pubParamBufByteSize = byteSize;
+        *pubParamBufByteSize = byteSize;
         // vector<u8> sendBuff(nSndVals * fieldElementSize);
         // Number alpha2(curve, *alphaPtr);
         // std::cout << "alphaPtr:" << *alphaPtr << endl;
@@ -161,7 +161,7 @@ namespace osuCrypto
         return 0;
     }
     int NaorPinkasReceiver::genPK0(u8 *pubParamBuf, const u64 pubParamBufByteSize,
-                                   const BitVector &choices, u8 **pk0Buf, u64 &pk0BufSize)
+                                   const BitVector &choices, u8 **pk0Buf, u64 *pk0BufSize)
     {
         u64 rNum = choices.size();
         cout << "rNum:" << rNum << endl;
@@ -182,8 +182,8 @@ namespace osuCrypto
         this->sks.reserve(otMsgPairSize);
         vector<Point> pks_sk;
         pks_sk.reserve(otMsgPairSize);
-        pk0BufSize = fieldElementSize * otMsgPairSize;
-        this->pk0sBuf.resize(pk0BufSize);
+        *pk0BufSize = fieldElementSize * otMsgPairSize;
+        this->pk0sBuf.resize(*pk0BufSize);
         *pk0Buf = this->pk0sBuf.data();
         Brick bg(g);      //基点G
         Point pk0(curve); //Ar

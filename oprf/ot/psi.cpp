@@ -93,7 +93,7 @@ namespace osuCrypto
                                     u8_t **pk0Buf, u64_t *pk0BufSize)
     {
         return this->iknpOteSender.genPK0FromNpot(pubParamBuf, pubParamBufByteSize,
-                                                  pk0Buf, *pk0BufSize);
+                                                  pk0Buf, pk0BufSize);
     }
     int PsiReceiver::getSendMatrixADBuff(const u8_t *uBuffInput, const u64_t uBuffInputSize,
                                          const vector<vector<u8_t>> receiverSet,
@@ -374,7 +374,7 @@ namespace osuCrypto
     //生成公共参数
     int PsiSender::genPublicParamFromNpot(u8_t **pubParamBuf, u64_t *pubParamBufByteSize)
     {
-        return this->iknpOteReceiver.genPublicParamFromNpot(pubParamBuf, *pubParamBufByteSize);
+        return this->iknpOteReceiver.genPublicParamFromNpot(pubParamBuf, pubParamBufByteSize);
     }
     //接收到pk0s,并生成T异或R 将uBuffOutput发送给对方
     int PsiSender::genMatrixTxorRBuff(u8_t *pk0Buf, const u64_t pk0BufSize,

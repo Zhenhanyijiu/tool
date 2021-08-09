@@ -43,7 +43,7 @@ namespace osuCrypto
         int init(PRNG &rng, const u32 otMsgPairSize = 1,
                  const u32 otPerMsgBitSize = 128);
         //对于发送方,生成公共参数A,C
-        int genPublicParam(u8 **pubParamBuf, u64 &pubParamBufByteSize);
+        int genPublicParam(u8 **pubParamBuf, u64 *pubParamBufByteSize);
         //一次ot，此协议只要传输一次pk0即可;如果encKey长度大于1，说明要发送的消息有多对；
         //encKey 存放ot最后一次传输所用的加密密钥
         int getEncKey(u8 *pk0Buf, const u64 pk0BufSize,
@@ -73,7 +73,7 @@ namespace osuCrypto
         int init(PRNG &rng, const u32 otMsgPairSize = 1,
                  const u32 otPerMsgBitSize = 128);
         int genPK0(u8 *pubParamBuf, const u64 pubParamBufByteSize,
-                   const BitVector &choices, u8 **pk0Buf, u64 &pk0BufSize);
+                   const BitVector &choices, u8 **pk0Buf, u64 *pk0BufSize);
         int getDecKey(vector<block> &decKey);
         int genOTRecover(const vector<block> &decKey, const BitVector &choices,
                          const vector<array<block, 2>> &otMsgCiphers,
