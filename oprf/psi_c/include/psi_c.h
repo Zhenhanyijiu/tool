@@ -4,8 +4,8 @@
 extern "C"
 {
 #endif
-//
-//
+//sender
+//recevicer
 #ifdef __cpulsplus
 }
 #endif

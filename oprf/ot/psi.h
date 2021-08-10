@@ -2,10 +2,12 @@
 #include <unordered_map>
 namespace osuCrypto
 {
-    typedef unsigned long int u64_t;
+    // typedef unsigned long long u64_t;
+    typedef uint64_t u64_t;
     // typedef block block_t;
     typedef unsigned char u8_t;
-    typedef unsigned int u32_t;
+    // typedef unsigned int u32_t;
+    typedef uint32_t u32_t;
     //psi 发送方结构定义如下
     class PsiSender
     {

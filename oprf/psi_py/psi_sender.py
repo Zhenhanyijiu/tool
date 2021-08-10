@@ -136,6 +136,7 @@ if __name__ == "__main__":
     sender_set = client.test_gen_data_set(sender_size, psi_size)
 
     # 1. 双方首先协商的公共种子
+    # common_seed:16字节的bytes，双方必须做到统一
     common_seed = b'1111111111111112'  # bytearray(b'1111111111111112')
     # 2. 创建接收方对象
     psi_sender = Sender(common_seed, sender_size)

@@ -3,13 +3,17 @@ from libc cimport string
 from libc.stdio cimport printf
 import numpy as np
 import time
-from libcpp.string cimport string as cppstr
+
+
+# from libcpp.string cimport string as cppstr
 # cdef extern from "Python.h":
 #     ctypedef struct PyObject:
 #         pass
 #     long Py_REFCNT(PyObject *)
+
+
 cdef extern from "psi.h" namespace "osuCrypto":
-    ctypedef unsigned long int u64_t
+    ctypedef unsigned long long u64_t
     ctypedef unsigned char u8_t
     ctypedef unsigned int u32_t
     cdef cppclass PsiSender:
@@ -39,10 +43,10 @@ cdef extern from "psi.h" namespace "osuCrypto":
         int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
                                             vector[u32_t] *psiMsgIndex)
 
-
 #Opef psi receiver
 cdef class OprfPsiReceiver:
     cdef PsiReceiver psi_receiver
+    #common_seed:16字节的bytes，双方必须做到统一
     def __init__(self, common_seed: bytes, receiver_size: int, sender_size: int, matrix_width: int = 128):
         if common_seed is None or len(common_seed) < 16:
             raise Exception('oprf psi receiver: param error')
@@ -76,7 +80,6 @@ cdef class OprfPsiReceiver:
         for i, v in enumerate(receiver_set):
             # receiverSet[i] = <vector[u8_t]> receiver_set[i]  #.encode('utf-8')
             receiverSet[i] = receiver_set[i].encode('utf-8')
-
         end = time.time_ns()
         print('===>>循环赋值recvset用时:{}ms'.format((end - start) / 1e6))
         cdef int ret = self.psi_receiver.getSendMatrixADBuff(matrix_TxorR, uBuffInputSize, receiverSet,
@@ -111,10 +114,10 @@ cdef class OprfPsiReceiver:
             raise Exception('oprf psi receiver: compute psi by hash2 output from sender error')
         return <list> psi_msg_index
 
-
 #Oprf psi sender
 cdef class OprfPsiSender(object):
     cdef PsiSender psi_sender
+    #common_seed:16字节的bytes，双方必须做到统一
     def __init__(self, common_seed: bytes, sender_size: int, matrix_width: int = 128):
         # self.sender_size = sender_size
         if common_seed is None or len(common_seed) < 16:

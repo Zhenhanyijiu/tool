@@ -102,7 +102,6 @@ class Server(object):
         ls = [b''] * n
         for i in range(0, n):
             ls[i] = md5(str(i).encode('utf-8')).hexdigest()[:21]
-
         return np.array(ls)
 
 
@@ -149,6 +148,7 @@ if __name__ == '__main__':
 
     print("===>>生成测试数据用时：{}ms".format(get_use_time(start0)))
     # 1. 双方首先协商的公共种子
+    # common_seed:16字节的bytes，双方必须做到统一
     common_seed = b'1111111111111112'
     # bytearray(b'1111111111111112')
     # 2. 创建接收方对象
