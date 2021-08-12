@@ -73,13 +73,7 @@ cdef class OprfPsiReceiver:
         cdef u8_t *matrix_AxorD_buff
         cdef u64_t matrix_AxorD_buff_size
         start = time.time_ns()
-        # cdef vector[vector[u8_t]] receiverSet = <vector[vector[u8_t]]> receiver_set
-        cdef vector[vector[u8_t]] receiverSet
-        recv_size = len(receiver_set)
-        receiverSet.resize(recv_size)
-        for i, v in enumerate(receiver_set):
-            # receiverSet[i] = <vector[u8_t]> receiver_set[i]  #.encode('utf-8')
-            receiverSet[i] = receiver_set[i].encode('utf-8')
+        cdef vector[vector[u8_t]] receiverSet = <vector[vector[u8_t]]> receiver_set
         end = time.time_ns()
         print('===>>循环赋值recvset用时:{}ms'.format((end - start) / 1e6))
         cdef int ret = self.psi_receiver.getSendMatrixADBuff(matrix_TxorR, uBuffInputSize, receiverSet,
@@ -154,14 +148,7 @@ cdef class OprfPsiSender(object):
     def recover_matrix_C(self, recv_matrix_A_xor_D: bytes, sender_set: np.array):
         # cdef u8_t *recvMatrixADBuff = recv_matrix_A_xor_D
         cdef u64_t recvMatixADBuffSize = len(recv_matrix_A_xor_D)
-        # cdef vector[vector[u8_t]] senderSet = <vector[vector[u8_t]]> sender_set
-
-        cdef vector[vector[u8_t]] senderSet
-        sender_size = len(sender_set)
-        senderSet.resize(sender_size)
-        for i, v in enumerate(sender_set):
-            # senderSet[i] = <vector[u8_t]> sender_set[i]  #.encode('utf-8')
-            senderSet[i] = sender_set[i].encode('utf-8')
+        cdef vector[vector[u8_t]] senderSet = <vector[vector[u8_t]]> sender_set
         cdef int ret = self.psi_sender.recoverMatrixC(recv_matrix_A_xor_D, recvMatixADBuffSize, senderSet)
         if ret != 0:
             raise Exception('oprf psi sender: recover matrix_C error')
