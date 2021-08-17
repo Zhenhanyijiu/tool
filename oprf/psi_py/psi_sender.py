@@ -3,7 +3,7 @@ import numpy as np
 import socket
 import sys
 from hashlib import sha256, md5
-import sys
+import sys, time
 import getopt
 
 
@@ -127,6 +127,10 @@ def parse_args(argv):
     return receiver_size, sender_size, psi_size, ip, port
 
 
+def get_use_time(start: int) -> float:
+    return (time.time() - start)*1000
+
+
 if __name__ == "__main__":
     receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
     print('receiver_size, sender_size, psi_size, ip, port=',
@@ -148,8 +152,10 @@ if __name__ == "__main__":
     client.send_data(pub_param)
     # 5.接收对方发来的公钥pk0s,作为输入，生成matrix_TxorR矩阵
     pk0s = client.recv_data()
+    start0 = time.time()
     matrix_TxorR, _ = psi_sender.gen_matrix_T_xor_R(pk0s)
     # print('===>>matrix_TxorR:', matrix_TxorR, len(matrix_TxorR))
+    print("===>>发送方生成matrix_TxorR用时:{}ms".format(get_use_time(start0)))
     # 6.将T_xor_R发送给对方
     client.send_data(matrix_TxorR)
     # 7.接收对方发来的 矩阵matrix_A_xor_D

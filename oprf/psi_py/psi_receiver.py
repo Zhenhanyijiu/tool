@@ -101,7 +101,8 @@ class Server(object):
     def test_gen_data_set(self, n: int, psi_size: int = 200000) -> np.array:
         ls = [b''] * n
         for i in range(0, n):
-            ls[i] = md5(str(i).encode('utf-8')).hexdigest()[:21].encode('utf-8')
+            ls[i] = md5(str(i).encode('utf-8')
+                        ).hexdigest()[:21].encode('utf-8')
         return np.array(ls)
 
 
@@ -138,6 +139,7 @@ def get_use_time(start: int) -> float:
 
 
 if __name__ == '__main__':
+    tmp(10)
     receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
     print('receiver_size, sender_size, psi_size, ip, port=',
           receiver_size, sender_size, psi_size, ip, port)
@@ -179,6 +181,7 @@ if __name__ == '__main__':
     count_debug = 0
     while psi_recv.is_receiver_end() == False:
         hash2_output_val = server.recv_data()
+        # print("===>>hash2_output_val length:", len(hash2_output_val))
         psi_recv.compute_psi_by_hash2_output(hash2_output_val)
         count_debug += 1
     print("===>>匹配用时：{}ms,循环次数：{}".format(get_use_time(start4), count_debug))
