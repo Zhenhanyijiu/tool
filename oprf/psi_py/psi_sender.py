@@ -128,7 +128,7 @@ def parse_args(argv):
 
 
 def get_use_time(start: int) -> float:
-    return (time.time() - start)*1000
+    return (time.time() - start) * 1000
 
 
 if __name__ == "__main__":
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     psi_sender = Sender(common_seed, sender_size)
     # 3. 本地生成公共参数public_param
     pub_param, pub_param_byte_size = psi_sender.gen_public_param()
-    print("+++", len(pub_param), pub_param, pub_param_byte_size)
+    print("===>", len(pub_param), pub_param, pub_param_byte_size)
     assert len(pub_param) == pub_param_byte_size
     # 4. 发送公共参数给对方
     client.send_data(pub_param)

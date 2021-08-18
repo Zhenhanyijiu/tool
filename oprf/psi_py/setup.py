@@ -89,4 +89,4 @@ if __name__ == '__main__':
     print('======== 编译cython 接口开始 ========')
     start_setup()
     print('======== 删除编译中产生的临时文件 ========')
-    os.system("rm -rf build/ libOTe/")
+    os.system("rm -rf build/ libOTe/ oprf_psi.cpp")

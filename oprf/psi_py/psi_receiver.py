@@ -139,7 +139,6 @@ def get_use_time(start: int) -> float:
 
 
 if __name__ == '__main__':
-    tmp(10)
     receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
     print('receiver_size, sender_size, psi_size, ip, port=',
           receiver_size, sender_size, psi_size, ip, port)
