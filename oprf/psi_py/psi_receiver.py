@@ -167,6 +167,7 @@ if __name__ == '__main__':
     # print('===>>matrix_TxorR:', matrix_TxorR, len(matrix_TxorR))
     # 7.生成矩阵matrix_A_xor_D
     start2 = time.time_ns()
+    print("===>>开始生成矩阵matrix_A_xor_D")
     matrix_A_xor_D, _ = psi_recv.gen_matrix_A_xor_D(matrix_TxorR, receiver_set)
     print("===>>生成matrix_A_xor_D用时：{}ms".format(get_use_time(start2)))
     # 8.发送矩阵matrix_A_xor_D给对方

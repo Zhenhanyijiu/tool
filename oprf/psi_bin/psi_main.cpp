@@ -383,8 +383,11 @@ int main(int argc, char **argv)
         char *matrixAxorD = nullptr;
         n = recv_data(client, &matrixAxorD);
         assert(n > 0);
+        //计算H1
+        fg = psiSender.computeAllHashOutputByH1(sendSet);
+        assert(fg == 0);
         long start3 = start_time();
-        fg = psiSender.recoverMatrixC((oc::u8 *)matrixAxorD, n, sendSet);
+        fg = psiSender.recoverMatrixC((oc::u8 *)matrixAxorD, n);
         assert(fg == 0);
         printf("send:recoverMatrixC所需时间:%ldms\n", get_use_time(start3));
         printf("send:OT所需时间:%ldms\n", get_use_time(start2));
@@ -503,7 +506,7 @@ int main(int argc, char **argv)
         // {
         //     cout << "i:" << i << "," << recvSet[i] << endl;
         // }
-        printf("psi count:%ld\n", psiMsgIndexs.size());
+        printf("psi count:%ld,最后索引:%d\n", psiMsgIndexs.size(), psiMsgIndexs[psiMsgIndexs.size() - 1]);
         assert(psiMsgIndexs.size() == Psi_Size);
         long start5 = start_time();
         if (outFile != "")

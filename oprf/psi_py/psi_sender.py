@@ -18,11 +18,14 @@ class Sender(object):
     def gen_matrix_T_xor_R(self, pk0s: bytes):
         return self.PsiSender.gen_matrix_T_xor_R(pk0s)
 
-    def recover_matrix_C(self, recv_matrix_A_xor_D: bytes, sender_set: np.array):
+    def compute_all_hash_output_by_H1(self, sender_set: np.array):
         sender_size = len(sender_set)
         if sender_size != self.sender_size:
             raise Exception('oprf psi sender: data_size is not equal,error')
-        self.PsiSender.recover_matrix_C(recv_matrix_A_xor_D, sender_set)
+        self.PsiSender.compute_all_hash_output_by_H1(sender_set)
+
+    def recover_matrix_C(self, recv_matrix_A_xor_D: bytes):
+        self.PsiSender.recover_matrix_C(recv_matrix_A_xor_D)
 
     def is_sender_end(self) -> bool:
         return self.PsiSender.is_sender_end()
@@ -158,10 +161,13 @@ if __name__ == "__main__":
     print("===>>发送方生成matrix_TxorR用时:{}ms".format(get_use_time(start0)))
     # 6.将T_xor_R发送给对方
     client.send_data(matrix_TxorR)
+    # 6.1接着计算所有的id的hash1值，避免改节点长时间等待
+    print('===>>开始类型转化、计算hash1')
+    psi_sender.compute_all_hash_output_by_H1(sender_set)
     # 7.接收对方发来的 矩阵matrix_A_xor_D
     matrix_A_xor_D = client.recv_data()
     # 8.恢复矩阵C,本接口没有输出
-    psi_sender.recover_matrix_C(matrix_A_xor_D, sender_set)
+    psi_sender.recover_matrix_C(matrix_A_xor_D)
     # 9.循环发送数据到对方
     while psi_sender.is_sender_end() == False:
         hash2_output_val, _ = psi_sender.compute_hash2_output_to_receiver()

@@ -5,7 +5,7 @@
 #include <cstdint>
 namespace osuCrypto
 {
-    //时间统计us
+    //时间统计ms
     long start_time()
     {
         struct timeval start;
@@ -23,7 +23,7 @@ namespace osuCrypto
     //将所有输入的数据以相同的方式H1做映射，以dataSetOutput返回
     void transformInputByH1(const AES &commonAes, const u64 h1LengthInBytes,
                             const vector<vector<u8>> &dataSetInput,
-                            block *&dataSetOutput)
+                            block *dataSetOutput)
     {
         u64 dataSetInputSize = dataSetInput.size();
         block *aesInput = new block[dataSetInputSize];
@@ -333,12 +333,12 @@ namespace osuCrypto
     PsiSender::PsiSender() {}
     // PsiSender::~PsiSender() {}
     //初始化
-    int PsiSender::init(u8_t *commonSeed, u64_t senderSize, u64_t matrixWidth, u64_t logHeight,
+    int PsiSender::init(u8_t *commonSeedIn, u64_t senderSize, u64_t matrixWidth, u64_t logHeight,
                         u64_t hash2LengthInBytes, u64_t bucket2ForComputeH2Output)
     {
         this->matrixWidth = matrixWidth;
         this->matrixWidthInBytes = (matrixWidth + 7) >> 3;
-        this->commonSeed = toBlock((u8 *)commonSeed);
+        // this->commonSeed = toBlock((u8 *)commonSeed);
         this->logHeight = logHeight;
         this->height = 1 << logHeight;
         this->heightInBytes = (this->height + 7) >> 3; //除以8
@@ -349,8 +349,9 @@ namespace osuCrypto
         this->h1LengthInBytes = 32;
         //todo
         this->hash2LengthInBytes = hash2LengthInBytes;
-        // block localSeedBlock = toBlock((u8 *)localSeed);
-        PRNG localRng(this->commonSeed);
+
+        block commonSeed = toBlock((u8 *)commonSeedIn);
+        PRNG localRng(commonSeed);
         //初始化一个向量r，长度为width
         this->choicesWidthInput.resize(matrixWidth);
         this->choicesWidthInput.randomize(localRng);
@@ -369,6 +370,9 @@ namespace osuCrypto
         this->lowL = (u64)0;
         // this->upR = (u64)0;
         printf("===>>this->lowL:%ld\n", this->lowL);
+        PRNG comPrng(commonSeed);
+        this->commonPrng = new PRNG(commonSeed);
+        this->sendSet = new block[this->senderSize];
         return this->iknpOteReceiver.init(localRng);
     }
     //生成公共参数
@@ -396,19 +400,37 @@ namespace osuCrypto
         *uBuffOutputSize = this->uBuffOutput.size() * sizeof(block);
         return 0;
     }
+    //计算所有id的hash1值，备用
+    int PsiSender::computeAllHashOutputByH1(const vector<vector<u8_t>> senderSet)
+    {
+        if (this->senderSize != senderSet.size())
+        {
+            return -111;
+        }
+        /////////// Transform input /////////////////////
+        block commonKey;
+        AES commonAesHash1, commonAesFkey;
+        this->commonPrng->get((u8 *)&commonKey, sizeof(block));
+        commonAesHash1.setKey(commonKey);
+        // block *sendSet = new block[this->senderSize];
+        transformInputByH1(commonAesHash1, this->h1LengthInBytes, senderSet, this->sendSet);
+        /////////// Transform input end /////////////////
+        return 0;
+    }
     //
-    int PsiSender::recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize,
-                                  const vector<vector<u8_t>> senderSet)
+    int PsiSender::recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize)
     {
         auto locationInBytes = (this->logHeight + 7) / 8;    // logHeight==1
         auto widthBucket1 = sizeof(block) / locationInBytes; // 16/1
         u64 shift = (1 << this->logHeight) - 1;              //全1
         ////////////// Initialization //////////////////////
-        PRNG commonPrng(this->commonSeed);
-        block commonKey;
-        AES commonAes;
+        // PRNG commonPrng(this->commonSeed);
         u8 *transLocations[widthBucket1]; // 16个u8*
-        if (this->senderSize != senderSet.size() || recvMatixADBuffSize != this->matrixWidth * this->heightInBytes)
+        // if (this->senderSize != senderSet.size() || recvMatixADBuffSize != this->matrixWidth * this->heightInBytes)
+        // {
+        //     return -111;
+        // }
+        if (recvMatixADBuffSize != this->matrixWidth * this->heightInBytes)
         {
             return -111;
         }
@@ -431,25 +453,30 @@ namespace osuCrypto
         { // senderSizeInBytes==32
             memset(this->transHashInputs[i].data(), 0, this->senderSizeInBytes);
         }
-        /////////// Transform input /////////////////////
-        commonPrng.get((u8 *)&commonKey, sizeof(block));
-        commonAes.setKey(commonKey);
-        block *sendSet = new block[this->senderSize];
-        transformInputByH1(commonAes, this->h1LengthInBytes, senderSet, sendSet);
-        /////////// Transform input end /////////////////
+        // /////////// Transform input /////////////////////
+        // block commonKey;
+        // AES commonAesHash1, commonAesFkey;
+        // this->commonPrng->get((u8 *)&commonKey, sizeof(block));
+        // commonAesHash1.setKey(commonKey);
+        // // block *sendSet = new block[this->senderSize];
+        // transformInputByH1(commonAesHash1, this->h1LengthInBytes, senderSet, this->sendSet);
+        // /////////// Transform input end /////////////////
         cout << "***********************before cycle" << endl;
+        block commonKey;
+        AES commonAesFkey;
         /****cycle start***/
+        long start1 = start_time();
         for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
         {
             auto wRight = wLeft + widthBucket1 < this->matrixWidth ? wLeft + widthBucket1 : this->matrixWidth;
             auto w = wRight - wLeft;
             //////////// Compute random locations (transposed) ////////////////
-            commonPrng.get((u8 *)&commonKey, sizeof(block));
-            commonAes.setKey(commonKey);
+            this->commonPrng->get((u8 *)&commonKey, sizeof(block));
+            commonAesFkey.setKey(commonKey);
             for (auto low = 0; low < this->senderSize; low += bucket1)
             {
                 auto up = low + bucket1 < this->senderSize ? low + bucket1 : this->senderSize;
-                commonAes.ecbEncBlocks(sendSet + low, up - low, randomLocations);
+                commonAesFkey.ecbEncBlocks(this->sendSet + low, up - low, randomLocations);
                 for (auto i = 0; i < w; ++i)
                 {
                     for (auto j = low; j < up; ++j)
@@ -496,13 +523,15 @@ namespace osuCrypto
         /****cycle end ****/
         //**************释放内存*************//
         cout << "***********************before cycle end" << endl;
+        printf("=====>>cycle 用时：%ldms\n", get_use_time(start1));
         for (auto i = 0; i < widthBucket1; ++i)
         {
             delete[] transLocations[i];
             delete[] matrixC[i];
             // printf(">>>>>>>>>i:%d,widthBucket1:%d\n", i, widthBucket1);
         }
-        delete[] sendSet;
+        delete[] this->sendSet;
+        delete this->commonPrng;
         printf(">>>>>>>>>> sendSet,end\n");
         return 0;
     }

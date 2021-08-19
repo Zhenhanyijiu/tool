@@ -14,7 +14,7 @@ namespace osuCrypto
     private:
         u64 matrixWidth;
         u64 matrixWidthInBytes;
-        block commonSeed;
+        // block commonSeed;
         u64 logHeight;
         u64 height;
         u64 heightInBytes;
@@ -31,7 +31,10 @@ namespace osuCrypto
         vector<vector<u8>> transHashInputs;
         vector<vector<u8>> hashInputs;
         IknpOtExtReceiver iknpOteReceiver;
-        vector<vector<u8>> senderSet;
+        // vector<vector<u8>> senderSet;
+        PRNG *commonPrng;
+        //对所有输入计算hash1,存到此处
+        block *sendSet;
         u64 lowL;
         // u64 upR;
 
@@ -47,9 +50,10 @@ namespace osuCrypto
         //接收对方pk0Buf；并生成T^R的结果uBuffOutput，发送给对方
         int genMatrixTxorRBuff(u8_t *pk0Buf, const u64_t pk0BufSize,
                                u8_t **uBuffOutputTxorR, u64_t *uBuffOutputSize);
+        //计算所有id的hash1值，备用
+        int computeAllHashOutputByH1(const vector<vector<u8_t>> senderSet);
         //接收recvMatrixADBuff，恢复出矩阵C
-        int recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize,
-                           const vector<vector<u8_t>> senderSet);
+        int recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize);
         //判断发送方发送数据是否结束
         int isSendEnd();
         //循环计算hash输出并发送给对方
