@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <cryptoTools/Crypto/RandomOracle.h>
 #include <cstdint>
+#include <pthread.h>
 namespace osuCrypto
 {
     //时间统计ms
@@ -19,17 +20,19 @@ namespace osuCrypto
         long usetime = end.tv_sec * 1000000 + end.tv_usec - start_time;
         return usetime / 1000;
     }
+
     //common function
     //将所有输入的数据以相同的方式H1做映射，以dataSetOutput返回
-    void transformInputByH1(const AES &commonAes, const u64 h1LengthInBytes,
-                            const vector<vector<u8>> &dataSetInput,
-                            block *dataSetOutput)
+    void transformInputByH1_old(const AES &commonAes, const u64 h1LengthInBytes,
+                                const vector<vector<u8>> &dataSetInput,
+                                block *dataSetOutput)
     {
         u64 dataSetInputSize = dataSetInput.size();
         block *aesInput = new block[dataSetInputSize];
         block *aesOutput = new block[dataSetInputSize];
         RandomOracle H1(h1LengthInBytes); // 32bytes
         u8 h1Output[h1LengthInBytes];     // 32bytes
+        long start0 = start_time();
         for (auto i = 0; i < dataSetInputSize; ++i)
         {
             // 256个元素
@@ -42,6 +45,68 @@ namespace osuCrypto
             // H2
             dataSetOutput[i] = *(block *)(h1Output + sizeof(block));
         }
+        printf("===>>H1内部for循环用时:%ldms\n", get_use_time(start0));
+        commonAes.ecbEncBlocks(aesInput, dataSetInputSize, aesOutput);
+        //生成dataSetOutput数据。文章中H1(y)
+        for (auto i = 0; i < dataSetInputSize; ++i)
+        {
+            dataSetOutput[i] ^= aesOutput[i];
+        }
+        delete[] aesInput;
+        delete[] aesOutput;
+    }
+    //多线程
+    //多线程处理
+    typedef struct HashOneInfo
+    {
+        int threadId;
+        int h1LengthInBytes;
+        u64 num;
+        block *aesInputStart;
+        block *dataSetOutputStart;
+        vector<u8> *dataSetInputStart;
+    } HashOneInfo;
+    void process_hash1_thread(void *arg)
+    {
+        HashOneInfo *info = (HashOneInfo *)arg;
+        RandomOracle H1(info->h1LengthInBytes); // 32bytes
+        u8 h1Output[info->h1LengthInBytes];     // 32bytes
+        for (auto i = 0; i < info->num; ++i)
+        {
+            // 256个元素
+            H1.Reset();
+            //对每一个y属于dataSetInput，映射成一个hash值，32字节（H1,H2）
+            H1.Update(info->dataSetInputStart[i].data(), info->dataSetInputStart[i].size());
+            H1.Final(h1Output);
+            // H1
+            info->aesInputStart[i] = *(block *)h1Output; //前16字节，后16字节
+            // H2
+            info->dataSetOutputStart[i] = *(block *)(h1Output + sizeof(block));
+        }
+    }
+    void transformInputByH1(const AES &commonAes, const u64 h1LengthInBytes,
+                            const vector<vector<u8>> &dataSetInput,
+                            block *dataSetOutput)
+    {
+        u64 dataSetInputSize = dataSetInput.size();
+        block *aesInput = new block[dataSetInputSize];
+        block *aesOutput = new block[dataSetInputSize];
+        RandomOracle H1(h1LengthInBytes); // 32bytes
+        u8 h1Output[h1LengthInBytes];     // 32bytes
+        long start0 = start_time();
+        for (auto i = 0; i < dataSetInputSize; ++i)
+        {
+            // 256个元素
+            H1.Reset();
+            //对每一个y属于dataSetInput，映射成一个hash值，32字节（H1,H2）
+            H1.Update(dataSetInput[i].data(), dataSetInput[i].size());
+            H1.Final(h1Output);
+            // H1
+            aesInput[i] = *(block *)h1Output; //前16字节，后16字节
+            // H2
+            dataSetOutput[i] = *(block *)(h1Output + sizeof(block));
+        }
+        printf("===>>H1内部for循环用时:%ldms\n", get_use_time(start0));
         commonAes.ecbEncBlocks(aesInput, dataSetInputSize, aesOutput);
         //生成dataSetOutput数据。文章中H1(y)
         for (auto i = 0; i < dataSetInputSize; ++i)

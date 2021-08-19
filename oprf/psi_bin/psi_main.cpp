@@ -379,13 +379,15 @@ int main(int argc, char **argv)
         assert(fg == 0);
         n = send_data(client, (char *)uBuffOutput, uBuffOutputSize);
         assert((oc::u64)n == uBuffOutputSize);
+        //计算H1 start（避免等待）
+        fg = psiSender.computeAllHashOutputByH1(sendSet);
+        assert(fg == 0);
+        //计算H1 end
         //[4]接收MatrixAxorD,生成矩阵C
         char *matrixAxorD = nullptr;
         n = recv_data(client, &matrixAxorD);
         assert(n > 0);
-        //计算H1
-        fg = psiSender.computeAllHashOutputByH1(sendSet);
-        assert(fg == 0);
+        //恢复矩阵C
         long start3 = start_time();
         fg = psiSender.recoverMatrixC((oc::u8 *)matrixAxorD, n);
         assert(fg == 0);
