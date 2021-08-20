@@ -4,6 +4,7 @@
 #include <cryptoTools/Crypto/RandomOracle.h>
 #include <cstdint>
 #include <pthread.h>
+#include <omp.h>
 namespace osuCrypto
 {
     //时间统计ms
@@ -24,8 +25,7 @@ namespace osuCrypto
     //common function
     //将所有输入的数据以相同的方式H1做映射，以dataSetOutput返回
     void transformInputByH1_old(const AES &commonAes, const u64 h1LengthInBytes,
-                                const vector<vector<u8>> &dataSetInput,
-                                block *dataSetOutput)
+                                const vector<vector<u8>> &dataSetInput, block *dataSetOutput)
     {
         u64 dataSetInputSize = dataSetInput.size();
         block *aesInput = new block[dataSetInputSize];
@@ -66,7 +66,91 @@ namespace osuCrypto
         block *dataSetOutputStart;
         vector<u8> *dataSetInputStart;
     } HashOneInfo;
-    void process_hash1_thread(void *arg)
+    void *process_hash1_thread(void *arg)
+    {
+        HashOneInfo *info = (HashOneInfo *)arg;
+        RandomOracle H1(info->h1LengthInBytes); // 32bytes
+        u8 h1Output[info->h1LengthInBytes];     // 32bytes
+        for (auto i = 0; i < info->num; ++i)
+        {
+            // 256个元素
+            H1.Reset();
+            //对每一个y属于dataSetInput，映射成一个hash值，32字节（H1,H2）
+            H1.Update(info->dataSetInputStart[i].data(), info->dataSetInputStart[i].size());
+            H1.Final(h1Output);
+            // H1
+            info->aesInputStart[i] = *(block *)h1Output; //前16字节，后16字节
+            // H2
+            info->dataSetOutputStart[i] = *(block *)(h1Output + sizeof(block));
+        }
+        pthread_exit(NULL);
+    }
+    void transformInputByH1_thread(const AES &commonAes, const u64 h1LengthInBytes,
+                                   const vector<vector<u8>> &dataSetInput, block *dataSetOutput)
+    {
+        u64 dataSetInputSize = dataSetInput.size();
+        block *aesInput = new block[dataSetInputSize];
+        block *aesOutput = new block[dataSetInputSize];
+        // RandomOracle H1(h1LengthInBytes); // 32bytes
+        // u8 h1Output[h1LengthInBytes];     // 32bytes
+        long start0 = start_time();
+        int numTh = 2;
+        pthread_t threads[numTh];
+        pthread_attr_t attr;
+        void *status;
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+        HashOneInfo infoArgs[numTh];
+        u64 stepLength = dataSetInputSize / numTh;
+        u64 remain = dataSetInputSize % numTh;
+        printf("===>>多线程stepLength:%ld\n", stepLength);
+        for (int i = 0; i < numTh; i++)
+        {
+            if (i == numTh - 1)
+            {
+                infoArgs[i].num = stepLength + remain;
+            }
+            else
+            {
+                infoArgs[i].num = stepLength;
+            }
+            infoArgs[i].threadId = i;
+            infoArgs[i].h1LengthInBytes = 32;
+            infoArgs[i].aesInputStart = aesInput + i * stepLength;
+            infoArgs[i].dataSetOutputStart = dataSetOutput + i * stepLength;
+            infoArgs[i].dataSetInputStart = (vector<u8> *)(dataSetInput.data()) + i * stepLength;
+            int fg = pthread_create(&threads[i], NULL, process_hash1_thread, (void *)(infoArgs + i));
+            if (fg)
+            {
+                printf("===>>create thread error\n");
+                exit(-1);
+            }
+            printf("===>>iii:%d\n", i);
+        }
+        // 删除属性，并等待其他线程
+        pthread_attr_destroy(&attr);
+        for (int i = 0; i < numTh; i++)
+        {
+            int fg = pthread_join(threads[i], &status);
+            if (fg)
+            {
+                printf("===>>pthread_join thread error\n");
+                exit(-1);
+            }
+        }
+        // pthread_exit(NULL);
+        printf("===>>H1内部for循环用时:%ldms\n", get_use_time(start0));
+        commonAes.ecbEncBlocks(aesInput, dataSetInputSize, aesOutput);
+        //生成dataSetOutput数据。文章中H1(y)
+        for (auto i = 0; i < dataSetInputSize; ++i)
+        {
+            dataSetOutput[i] ^= aesOutput[i];
+        }
+        delete[] aesInput;
+        delete[] aesOutput;
+    }
+    //用omp指令
+    void process_hash1_omp(void *arg)
     {
         HashOneInfo *info = (HashOneInfo *)arg;
         RandomOracle H1(info->h1LengthInBytes); // 32bytes
@@ -85,26 +169,41 @@ namespace osuCrypto
         }
     }
     void transformInputByH1(const AES &commonAes, const u64 h1LengthInBytes,
-                            const vector<vector<u8>> &dataSetInput,
-                            block *dataSetOutput)
+                            const vector<vector<u8>> &dataSetInput, block *dataSetOutput)
     {
         u64 dataSetInputSize = dataSetInput.size();
         block *aesInput = new block[dataSetInputSize];
         block *aesOutput = new block[dataSetInputSize];
-        RandomOracle H1(h1LengthInBytes); // 32bytes
-        u8 h1Output[h1LengthInBytes];     // 32bytes
+        // RandomOracle H1(h1LengthInBytes); // 32bytes
+        // u8 h1Output[h1LengthInBytes];     // 32bytes
         long start0 = start_time();
-        for (auto i = 0; i < dataSetInputSize; ++i)
+        int numTh = 4;
+
+        HashOneInfo infoArgs[numTh];
+        u64 stepLength = dataSetInputSize / numTh;
+        u64 remain = dataSetInputSize % numTh;
+        printf("===>>omp stepLength:%ld\n", stepLength);
+
+        for (int i = 0; i < numTh; i++)
         {
-            // 256个元素
-            H1.Reset();
-            //对每一个y属于dataSetInput，映射成一个hash值，32字节（H1,H2）
-            H1.Update(dataSetInput[i].data(), dataSetInput[i].size());
-            H1.Final(h1Output);
-            // H1
-            aesInput[i] = *(block *)h1Output; //前16字节，后16字节
-            // H2
-            dataSetOutput[i] = *(block *)(h1Output + sizeof(block));
+            if (i == numTh - 1)
+            {
+                infoArgs[i].num = stepLength + remain;
+            }
+            else
+            {
+                infoArgs[i].num = stepLength;
+            }
+            infoArgs[i].threadId = i;
+            infoArgs[i].h1LengthInBytes = 32;
+            infoArgs[i].aesInputStart = aesInput + i * stepLength;
+            infoArgs[i].dataSetOutputStart = dataSetOutput + i * stepLength;
+            infoArgs[i].dataSetInputStart = (vector<u8> *)(dataSetInput.data()) + i * stepLength;
+        }
+#pragma omp parallel for num_threads(numTh)
+        for (int i = 0; i < numTh; i++)
+        {
+            process_hash1_omp((void *)(infoArgs + i));
         }
         printf("===>>H1内部for循环用时:%ldms\n", get_use_time(start0));
         commonAes.ecbEncBlocks(aesInput, dataSetInputSize, aesOutput);
@@ -218,6 +317,7 @@ namespace osuCrypto
         printf("===>>计算H1用时:%ldms\n", get_use_time(start0));
         ////////// Transform input end //////////////////
         /*********for cycle start*********/
+        printf("===>>widthBucket1(16/loc):%d,locationInBytes:%d\n", widthBucket1, locationInBytes);
         for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
         {
             auto wRight = wLeft + widthBucket1 < this->matrixWidth ? wLeft + widthBucket1 : this->matrixWidth;

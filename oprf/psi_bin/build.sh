@@ -43,7 +43,8 @@ ${CRYPTO_INCLUDE}/cryptoTools/Common/*.cpp \
 ${BLAKE2_DIR}/*.c \
 ${CRYPTO_INCLUDE}/cryptoTools/Crypto/*.cpp \
 ../ot/*.cpp \
-psi_main.cpp -o psi
+-lpthread \
+psi_main.cpp -o psi -fopenmp
 # -lpthread \
 # ################C++14##############3
 # BLAKE2_DIR=../../libOTe/cryptoTools/cryptoTools/Crypto/blake2

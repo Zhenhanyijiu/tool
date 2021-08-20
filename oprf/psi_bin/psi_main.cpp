@@ -380,6 +380,7 @@ int main(int argc, char **argv)
         n = send_data(client, (char *)uBuffOutput, uBuffOutputSize);
         assert((oc::u64)n == uBuffOutputSize);
         //计算H1 start（避免等待）
+        printf("===>>避免等待，开始计算hash1...\n");
         fg = psiSender.computeAllHashOutputByH1(sendSet);
         assert(fg == 0);
         //计算H1 end
@@ -466,6 +467,7 @@ int main(int argc, char **argv)
         oc::u64 matrixADBuffSize = 0;
         n = recv_data(server, &uBuffInput);
         assert(n > 0);
+        printf("===>>避免等待，开始计算hash1...\n");
         long start2 = start_time();
         fg = psiRecv.getSendMatrixADBuff((oc::u8 *)uBuffInput, n, recvSet,
                                          (oc::u8 **)&matrixADBuff, &matrixADBuffSize);
