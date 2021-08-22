@@ -7,18 +7,19 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"prigo/algo/message"
 	"time"
 )
 
-type Request struct {
-	Key  string `json:"key"`
-	Data []byte `json:"data"`
-}
-type Response struct {
-}
+//type Request struct {
+//	Key  string `json:"key"`
+//	Data []byte `json:"data"`
+//}
+//type Response struct {
+//}
 
 type Channel struct {
-	cache  *Cache
+	cache  *BigCache
 	ipAddr string
 }
 
@@ -29,15 +30,16 @@ func NewChannel(ipAddr string) (*Channel, error) {
 	}
 	return &Channel{cache: c, ipAddr: ipAddr}, nil
 }
+
 func (ch *Channel) start() {
 	r := gin.New()
 	r.POST("/cache", func(c *gin.Context) {
-		var req Request
+		var req message.MsgChannelRequest
 		err := c.BindJSON(&req)
 		if err != nil {
 			fmt.Printf("")
 		}
-		ch.cache.SetValue(req.Key, req.Data)
+		SetValue(req.Key, req.Data)
 		c.JSON(200, gin.H{
 			"msg": "ok",
 		})
@@ -49,7 +51,7 @@ func (ch *Channel) Start() {
 }
 func (c *Channel) SendData(tar_url string, key string, data []byte) {
 	cli := http.Client{}
-	req := Request{
+	req := message.MsgChannelRequest{
 		Key:  key,
 		Data: data,
 	}
@@ -66,7 +68,7 @@ func (c *Channel) RecvData(key string, timeout int) ([]byte, error) {
 			fmt.Printf("get data timeout")
 			return nil, errors.New("recv data timeout")
 		default:
-			data, err := c.cache.GetValue(key)
+			data, err := c.cache.getValue(key)
 			if err == nil {
 				return data, nil
 			} else if err != ErrNotFound {
