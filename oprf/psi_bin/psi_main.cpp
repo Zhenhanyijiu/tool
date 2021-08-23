@@ -398,19 +398,32 @@ int main(int argc, char **argv)
         vector<oc::u8> hashOutputOnceBuff(hash2LengthInBytes * bucket2ForComputeH2Output);
         oc::u64 hashOutputOnceBuffSize = 0;
         int totalCyc = senderSize / bucket2ForComputeH2Output;
-        int count = 0;
+        int count = 0, countTmp = 10;
         int ret = psiSender.isSendEnd();
         printf("===>>isSendEnd:%d\n", ret);
         // for (auto low = 0; low < senderSize;low+=bucket2ForComputeH2Output)
         long start4 = start_time();
+        long int start00;
         for (; psiSender.isSendEnd() == 0;)
         {
+            if (count < countTmp)
+            {
+                start00 = start_time();
+            }
             // auto up = low + bucket2ForComputeH2Output < senderSize ? low + bucket2ForComputeH2Output : senderSize;
             fg = psiSender.computeHashOutputToReceiverOnce(hashOutputOnceBuff.data(), &hashOutputOnceBuffSize);
             assert(fg == 0);
+            if (count < countTmp)
+            {
+                printf("count:%d,send:计算一次H2Output所需时间:%ldms\n", count, get_use_time(start00));
+            }
             n = send_data(client, (char *)hashOutputOnceBuff.data(), hashOutputOnceBuffSize);
-            count++;
             assert((oc::u64)n == hashOutputOnceBuffSize);
+            if (count < countTmp)
+            {
+                printf("count:%d,send:计算一次H2Output并发送所需时间:%ldms\n", count, get_use_time(start00));
+            }
+            count++;
         }
 
         printf("===>>count:%d\n", count);
@@ -487,21 +500,33 @@ int main(int argc, char **argv)
         int totalCyc = senderSize / bucket2ForComputeH2Output;
         printf("===>>sendersize:%ld,bucket2ForComputeH2Output:%d,totalCyc:%d\n",
                senderSize, bucket2ForComputeH2Output, totalCyc);
-        int count = 0;
+        int count = 0, countTmp = 10;
+        long int start00;
         for (; psiRecv.isRecvEnd() == 0;)
         {
+            if (count < countTmp)
+            {
+                start00 = start_time();
+            }
             // auto up = low + bucket2ForComputeH2Output < senderSize ? low + bucket2ForComputeH2Output : senderSize;
             n = recv_data(server, &hashOutput);
-            count++;
             if (n <= 0)
             {
                 printf("===>>count:%d\n", count);
             }
             assert(n > 0);
+            if (count < countTmp)
+            {
+                printf("count:%d,recv:接收一次H2Ouput所需时间:%ldms\n", count, get_use_time(start00));
+            }
             fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput,
                                                          n, &psiMsgIndexs);
-            // printf("fg=>%d\n", fg);
             assert(fg == 0);
+            if (count < countTmp)
+            {
+                printf("count:%d,recv:接收一次H2Ouput并匹配所需时间:%ldms\n", count, get_use_time(start00));
+            }
+            count++;
         }
         // long useTimeFind = getEndTime(timeCompute);
         printf("recv: 匹配find用时：%ldms,totalCyc:%d,count:%d\n", get_use_time(start4), totalCyc, count);

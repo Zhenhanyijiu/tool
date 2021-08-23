@@ -218,8 +218,8 @@ int main()
     pthread_exit(NULL);
 }
 #endif
-#if 1
 using namespace std;
+#if 0
 typedef struct Info
 {
     int id;
@@ -302,5 +302,20 @@ int main()
         printf("===>>>vecOutput[%d]=%s\n", i, vecOutput[i].data());
     }
     pthread_exit(NULL);
+}
+#endif
+#include <unordered_map>
+typedef char char16[16];
+#if 1
+int main()
+{
+    //std::vector<std::pair<char16, uint32_t>>
+    unordered_map<uint64_t, uint64_t> allHashes;
+    printf("size:%ld\n", allHashes.size());
+    char16 id;
+    allHashes[1] = 77;
+    allHashes[1] = 777;
+    printf("size:%ld,val:%ld\n", allHashes.size(), allHashes[1]);
+    return 0;
 }
 #endif
