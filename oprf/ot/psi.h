@@ -13,6 +13,7 @@ namespace osuCrypto
     class PsiSender
     {
     private:
+        int threadNumOmp;
         u64 matrixWidth;
         u64 matrixWidthInBytes;
         // block commonSeed;
@@ -44,7 +45,7 @@ namespace osuCrypto
         ~PsiSender();
         //初始化psiSender
         int init(u8_t *commonSeed, u64_t senderSize, u64_t matrixWidth, u64_t logHeight,
-                 u64_t hash2LengthInBytes = 10, u64_t bucket2ForComputeH2Output = 256);
+                 int threadNum = 1, u64_t hash2LengthInBytes = 10, u64_t bucket2ForComputeH2Output = 256);
 
         //生成基本ot协议的公共参数，并发送给对方
         int genPublicParamFromNpot(u8_t **pubParamBuf, u64_t *pubParamBufByteSize);
@@ -76,6 +77,7 @@ namespace osuCrypto
     {
     private:
         //目前w<=512*1024
+        int threadNumOmp;
         u64 matrixWidth;
         u64 matrixWidthInBytes;
         u64 receiverSize;
@@ -99,11 +101,11 @@ namespace osuCrypto
 
     public:
         PsiReceiver();
-        // ~PsiReceiver();
+        ~PsiReceiver();
         //初始化psiReceiver
         //commonSeed,localSeed 长度为16字节
-        int init(u8_t *commonSeed, u64_t receiverSize, u64_t senderSize,
-                 u64_t matrixWidth, u64_t logHeight, u64_t hash2LengthInBytes = 10,
+        int init(u8_t *commonSeed, u64_t receiverSize, u64_t senderSize, u64_t matrixWidth,
+                 u64_t logHeight, int threadNum = 1, u64_t hash2LengthInBytes = 10,
                  u64_t bucket2ForComputeH2Output = 256);
         //接收对方发送过来的公共参数，并根据baseot choices输入生成pk0s,并发送过对方
         int genPK0FromNpot(u8_t *pubParamBuf, const u64_t pubParamBufByteSize,
