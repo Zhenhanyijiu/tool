@@ -26,7 +26,7 @@ namespace osuCrypto
     }
     NaorPinkasSender::~NaorPinkasSender()
     {
-        delete alphaPtr;
+        delete this->alphaPtr;
     }
     int NaorPinkasSender::init(PRNG &rng, const u32 otMsgPairSize,
                                const u32 otPerMsgBitSize)
@@ -52,7 +52,7 @@ namespace osuCrypto
         u64 byteSize = fieldElementSize * this->nSndVals;
         pubPCParamBuf.resize(byteSize);
         this->pC.emplace_back(this->curve);
-        this->pC[0] = g * (*alphaPtr); // A=alpha*G
+        this->pC[0] = g * (*this->alphaPtr); // A=alpha*G
         this->pC[0].toBytes(pubPCParamBuf.data());
         Number tmp(this->curve);
         for (u64 u = 1; u < this->nSndVals; u++)
@@ -99,7 +99,7 @@ namespace osuCrypto
             //对于第i对消息，获取pPK0==k*G
             pPK0.fromBytes(pk0Buf + i * fieldElementSize);
             //计算a*pPK0
-            PK0a = pPK0 * (*alphaPtr);
+            PK0a = pPK0 * (*(this->alphaPtr));
             //将点转化成压缩形式
             PK0a.toBytes(hashInBuff.data()); // PK0a=(x,y),取x
             //计算hash，text=i||hashInBuff||R做hash运算,并将结果存到messages[i][0]中
@@ -110,7 +110,7 @@ namespace osuCrypto
             //结果存到messages[i][0]中
             sha.Final(encKeys[i][0]);
             //处理另一个Ca/PK0a
-            fetmp = this->pC[1] * (*alphaPtr) - PK0a;
+            fetmp = this->pC[1] * (*(this->alphaPtr)) - PK0a;
             fetmp.toBytes(hashInBuff.data());
             sha.Reset();
             sha.Update((u8 *)&i, sizeof(i));

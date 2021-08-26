@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <pthread.h>
 #include <omp.h>
+#include <unistd.h>
 namespace osuCrypto
 {
     //时间统计ms
@@ -415,6 +416,62 @@ namespace osuCrypto
         return 0;
     }
     //将sendMatrixADBuff发送给对方之后，接下来生成AllHashMap
+    //并行处理
+    typedef struct HashMapParallelInfo
+    {
+        int threadId;
+        u64 startIndex;
+        u64 processNum;
+        u64 receiverSize;
+        u64 matrixWidth;
+        u64 matrixWidthInBytes;
+        u64 hash2LengthInBytes;
+        u64 bucket2ForComputeH2Output;
+        vector<u8> *transHashInputsPtr;
+        unordered_map<u64, std::vector<std::pair<block, u32_t>>> *hashMap;
+    } HashMapParallelInfo;
+    void process_for_hash_map(HashMapParallelInfo *infoArg)
+    {
+        RandomOracle H(infoArg->hash2LengthInBytes);
+        u8 hashOutput[sizeof(block)];
+        u8 *hashInputs[infoArg->bucket2ForComputeH2Output];
+        for (auto i = 0; i < infoArg->bucket2ForComputeH2Output; ++i)
+        {
+            hashInputs[i] = new u8[infoArg->matrixWidthInBytes];
+        }
+        //接收集合中的每个元素
+        u64 rightIndex = infoArg->startIndex + infoArg->processNum;
+        for (auto low = infoArg->startIndex; low < rightIndex; low += infoArg->bucket2ForComputeH2Output)
+        {
+            auto up = low + infoArg->bucket2ForComputeH2Output < rightIndex ? low + infoArg->bucket2ForComputeH2Output : rightIndex;
+            for (auto j = low; j < up; ++j)
+            {
+                memset(hashInputs[j - low], 0, infoArg->matrixWidthInBytes);
+            }
+            for (auto i = 0; i < infoArg->matrixWidth; ++i)
+            {
+                for (auto j = low; j < up; ++j)
+                {
+                    hashInputs[j - low][i >> 3] |=
+                        (u8)((bool)(infoArg->transHashInputsPtr[i][j >> 3] & (1 << (j & 7))))
+                        << (i & 7);
+                }
+            }
+            for (auto j = low; j < up; ++j)
+            {
+                H.Reset();
+                H.Update(hashInputs[j - low], infoArg->matrixWidthInBytes);
+                H.Final(hashOutput);
+                //生成一个map并保存
+                infoArg->hashMap[0][*(u64 *)hashOutput].push_back(
+                    std::make_pair(*(block *)hashOutput, j));
+            }
+        }
+        for (auto i = 0; i < infoArg->bucket2ForComputeH2Output; ++i)
+        {
+            delete[] hashInputs[i];
+        }
+    }
     int PsiReceiver::genenateAllHashesMap()
     {
         /////////////////// Compute hash outputs ///////////////////////////
@@ -422,43 +479,84 @@ namespace osuCrypto
         RandomOracle H(this->hash2LengthInBytes);
         u8 hashOutput[sizeof(block)];
         u8 *hashInputs[this->bucket2ForComputeH2Output];
-        for (auto i = 0; i < this->bucket2ForComputeH2Output; ++i)
+        int threadNum = 4;
+        this->HashMapVector.resize(threadNum);
+        u64 processLen = this->receiverSize / threadNum;
+        u64 remain = this->receiverSize % threadNum;
+        HashMapParallelInfo infoArgs[threadNum];
+        for (int i = 0; i < threadNum; i++)
         {
-            hashInputs[i] = new u8[this->matrixWidthInBytes];
+            infoArgs[i].threadId = 0;
+            infoArgs[i].startIndex = i * processLen;
+            if (i == threadNum - 1)
+            {
+                infoArgs[i].processNum = processLen + remain;
+            }
+            else
+            {
+                infoArgs[i].processNum = processLen;
+            }
+            infoArgs[i].receiverSize = this->receiverSize;
+            infoArgs[i].matrixWidth = this->matrixWidth;
+            infoArgs[i].matrixWidthInBytes = this->matrixWidthInBytes;
+            infoArgs[i].hash2LengthInBytes = this->hash2LengthInBytes;
+            infoArgs[i].bucket2ForComputeH2Output = this->bucket2ForComputeH2Output;
+            infoArgs[i].transHashInputsPtr = (vector<u8> *)(this->transHashInputs.data());
+            infoArgs[i].hashMap = (unordered_map<u64, std::vector<std::pair<block, u32_t>>> *)(this->HashMapVector.data() + i);
         }
-        //接收集合中的每个元素
-        for (auto low = 0; low < this->receiverSize; low += this->bucket2ForComputeH2Output)
+#pragma omp parallel for num_threads(threadNum)
+        for (int i = 0; i < threadNum; i++)
         {
-            auto up = low + this->bucket2ForComputeH2Output < this->receiverSize ? low + this->bucket2ForComputeH2Output : this->receiverSize;
-            for (auto j = low; j < up; ++j)
-            {
-                memset(hashInputs[j - low], 0, this->matrixWidthInBytes);
-            }
-            for (auto i = 0; i < this->matrixWidth; ++i)
-            {
-                for (auto j = low; j < up; ++j)
-                {
-                    hashInputs[j - low][i >> 3] |=
-                        (u8)((bool)(this->transHashInputs[i][j >> 3] & (1 << (j & 7))))
-                        << (i & 7);
-                }
-            }
-            for (auto j = low; j < up; ++j)
-            {
-                H.Reset();
-                H.Update(hashInputs[j - low], this->matrixWidthInBytes);
-                H.Final(hashOutput);
-                //生成一个map并保存
-                this->allHashes[*(u64 *)hashOutput].push_back(
-                    std::make_pair(*(block *)hashOutput, j));
-            }
+            process_for_hash_map(infoArgs + i);
         }
-        for (auto i = 0; i < this->bucket2ForComputeH2Output; ++i)
-        {
-            delete[] hashInputs[i];
-        }
+
         return 0;
     }
+    //将sendMatrixADBuff发送给对方之后，接下来生成AllHashMap
+    // int PsiReceiver::genenateAllHashesMap_Old()
+    // {
+    //     /////////////////// Compute hash outputs ///////////////////////////
+    //     //H2
+    //     RandomOracle H(this->hash2LengthInBytes);
+    //     u8 hashOutput[sizeof(block)];
+    //     u8 *hashInputs[this->bucket2ForComputeH2Output];
+    //     for (auto i = 0; i < this->bucket2ForComputeH2Output; ++i)
+    //     {
+    //         hashInputs[i] = new u8[this->matrixWidthInBytes];
+    //     }
+    //     //接收集合中的每个元素
+    //     for (auto low = 0; low < this->receiverSize; low += this->bucket2ForComputeH2Output)
+    //     {
+    //         auto up = low + this->bucket2ForComputeH2Output < this->receiverSize ? low + this->bucket2ForComputeH2Output : this->receiverSize;
+    //         for (auto j = low; j < up; ++j)
+    //         {
+    //             memset(hashInputs[j - low], 0, this->matrixWidthInBytes);
+    //         }
+    //         for (auto i = 0; i < this->matrixWidth; ++i)
+    //         {
+    //             for (auto j = low; j < up; ++j)
+    //             {
+    //                 hashInputs[j - low][i >> 3] |=
+    //                     (u8)((bool)(this->transHashInputs[i][j >> 3] & (1 << (j & 7))))
+    //                     << (i & 7);
+    //             }
+    //         }
+    //         for (auto j = low; j < up; ++j)
+    //         {
+    //             H.Reset();
+    //             H.Update(hashInputs[j - low], this->matrixWidthInBytes);
+    //             H.Final(hashOutput);
+    //             //生成一个map并保存
+    //             this->allHashes[*(u64 *)hashOutput].push_back(
+    //                 std::make_pair(*(block *)hashOutput, j));
+    //         }
+    //     }
+    //     for (auto i = 0; i < this->bucket2ForComputeH2Output; ++i)
+    //     {
+    //         delete[] hashInputs[i];
+    //     }
+    //     return 0;
+    // }
     //判断接收方接收数据是否结束
     int PsiReceiver::isRecvEnd()
     {
@@ -476,27 +574,64 @@ namespace osuCrypto
         for (auto idx = 0; idx < up - this->lowL; ++idx)
         {
             u64 mapIdx = *(u64 *)(recvBuff + idx * this->hash2LengthInBytes);
-            auto found = this->allHashes.find(mapIdx);
-            if (found == this->allHashes.end())
-                continue;
-            //可能找到好几个
-            for (auto i = 0; i < found->second.size(); ++i)
+            for (int i = 0; i < this->HashMapVector.size(); i++)
             {
-                if (memcmp(&(found->second[i].first),
-                           recvBuff + idx * this->hash2LengthInBytes,
-                           this->hash2LengthInBytes) == 0)
+                auto found = this->HashMapVector[i].find(mapIdx);
+                if (found == this->HashMapVector[i].end())
+                    continue;
+                //可能找到好几个
+                for (auto i = 0; i < found->second.size(); ++i)
                 {
-                    psiMsgIndex->push_back(found->second[i].second);
-                    break;
+                    if (memcmp(&(found->second[i].first),
+                               recvBuff + idx * this->hash2LengthInBytes,
+                               this->hash2LengthInBytes) == 0)
+                    {
+                        psiMsgIndex->push_back(found->second[i].second);
+                        break;
+                    }
                 }
             }
         }
         this->lowL += this->bucket2ForComputeH2Output;
         return 0;
     }
+    ////PsiReceiver,接收对方发来的hash输出
+    // int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
+    //                                                  vector<u32_t> *psiMsgIndex)
+    // {
+    //     auto up = this->lowL + this->bucket2ForComputeH2Output < this->senderSize ? this->lowL + this->bucket2ForComputeH2Output : this->senderSize;
+    //     if (recvBufSize != (up - this->lowL) * this->hash2LengthInBytes)
+    //     {
+    //         return -122;
+    //     }
+    //     for (auto idx = 0; idx < up - this->lowL; ++idx)
+    //     {
+    //         u64 mapIdx = *(u64 *)(recvBuff + idx * this->hash2LengthInBytes);
+    //         auto found = this->allHashes.find(mapIdx);
+    //         if (found == this->allHashes.end())
+    //             continue;
+    //         //可能找到好几个
+    //         for (auto i = 0; i < found->second.size(); ++i)
+    //         {
+    //             if (memcmp(&(found->second[i].first),
+    //                        recvBuff + idx * this->hash2LengthInBytes,
+    //                        this->hash2LengthInBytes) == 0)
+    //             {
+    //                 psiMsgIndex->push_back(found->second[i].second);
+    //                 break;
+    //             }
+    //         }
+    //     }
+    //     this->lowL += this->bucket2ForComputeH2Output;
+    //     return 0;
+    // }
     //******************PsiSender*********************//
     PsiSender::PsiSender() {}
-    // PsiSender::~PsiSender() {}
+    PsiSender::~PsiSender()
+    {
+        delete[] this->sendSet;
+        delete this->commonPrng;
+    }
     //初始化
     int PsiSender::init(u8_t *commonSeedIn, u64_t senderSize, u64_t matrixWidth, u64_t logHeight,
                         u64_t hash2LengthInBytes, u64_t bucket2ForComputeH2Output)
@@ -530,7 +665,7 @@ namespace osuCrypto
         for (int i = 0; i < this->matrixWidth; i++)
         {
             this->transHashInputs[i].resize(this->senderSizeInBytes);
-            // memset(this->transHashInputs[i].data(), 0, this->senderSizeInBytes);
+            memset(this->transHashInputs[i].data(), 0, this->senderSizeInBytes);
         }
         this->lowL = (u64)0;
         // this->upR = (u64)0;
@@ -582,66 +717,76 @@ namespace osuCrypto
         /////////// Transform input end /////////////////
         return 0;
     }
-    //
-    int PsiSender::recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize)
+    //并行 recoverMatrixC
+    typedef struct RecoverMatrixCInfo
     {
-        auto locationInBytes = (this->logHeight + 7) / 8;    // logHeight==1
-        auto widthBucket1 = sizeof(block) / locationInBytes; // 16/1
-        u64 shift = (1 << this->logHeight) - 1;              //全1
-        ////////////// Initialization //////////////////////
-        // PRNG commonPrng(this->commonSeed);
-        u8 *transLocations[widthBucket1]; // 16个u8*
-        // if (this->senderSize != senderSet.size() || recvMatixADBuffSize != this->matrixWidth * this->heightInBytes)
-        // {
-        //     return -111;
-        // }
-        if (recvMatixADBuffSize != this->matrixWidth * this->heightInBytes)
-        {
-            return -111;
-        }
+        int threadId;
+        //1
+        u64 shift;
+        //2
+        u64 wLeftBegin;
+        //3
+        u64 processNum;
+        //4
+        u64 aesKeyNum;
+        //5
+        u64 aesComkeysBegin;
+        //6
+        block *aesComKeys;
+        // AES *currThreadAesFkey;
+        //7
+        u64 senderSize;
+        //8
+        u64 heightInBytes;
+        //9
+        u64 locationInBytes;
+        //10
+        u64 bucket1;
+        //11
+        u64 widthBucket1;
+        //12
+        block *sendset;
+        //13
+        block *recoverMsgWidthOutputPtr;
+        //14
+        int *choicesWidthInputPtr;
+        //15
+        const u8 *recvMatrixADBuffBegin;
+        //16
+        vector<u8> *transHashInputsPtr;
+    } RecoverMatrixCInfo;
+
+    void process_recover_matrix_C(RecoverMatrixCInfo *infoArg)
+    {
+        int cycTimes = 0;
+        u64 widthBucket1 = infoArg->widthBucket1;
+        u64 bucket1 = infoArg->bucket1;
+        u64 senderSize = infoArg->senderSize;
+        u64 heightInBytes = infoArg->heightInBytes;
+        u64 locationInBytes = infoArg->locationInBytes;
+        block randomLocations[bucket1]; // 256个block
+        u8 *matrixC[widthBucket1];      // 16
+        u8 *transLocations[widthBucket1];
         for (auto i = 0; i < widthBucket1; ++i)
         {
             // 256*1+4，每个元素为u8*，下面语句为创建一个u8*,260个u8
-            transLocations[i] = new u8[this->senderSize * locationInBytes + sizeof(u32)];
+            transLocations[i] = new u8[senderSize * locationInBytes + sizeof(u32)];
+            matrixC[i] = new u8[heightInBytes]; // 32
         }
-        // auto tn = senderSize * locationInBytes + sizeof(u32);
-        // cout << "####transLocations中每一列的字节数：" << tn << "\n";
-        // bucket1 = bucket2 = 1 << 8;  // 256
-        block randomLocations[this->bucket1]; // 256个block
-        u8 *matrixC[widthBucket1];            // 16
-        for (auto i = 0; i < widthBucket1; ++i)
+        for (auto wLeft = 0; wLeft < infoArg->processNum; wLeft += widthBucket1, cycTimes++)
         {
-            matrixC[i] = new u8[this->heightInBytes]; // 32
-        }
-        // u8 *transHashInputs[this->matrixWidth]; // width==60，矩阵宽度
-        for (auto i = 0; i < this->matrixWidth; ++i)
-        { // senderSizeInBytes==32
-            memset(this->transHashInputs[i].data(), 0, this->senderSizeInBytes);
-        }
-        // /////////// Transform input /////////////////////
-        // block commonKey;
-        // AES commonAesHash1, commonAesFkey;
-        // this->commonPrng->get((u8 *)&commonKey, sizeof(block));
-        // commonAesHash1.setKey(commonKey);
-        // // block *sendSet = new block[this->senderSize];
-        // transformInputByH1(commonAesHash1, this->h1LengthInBytes, senderSet, this->sendSet);
-        // /////////// Transform input end /////////////////
-        cout << "***********************before cycle" << endl;
-        block commonKey;
-        AES commonAesFkey;
-        /****cycle start***/
-        long start1 = start_time();
-        for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
-        {
-            auto wRight = wLeft + widthBucket1 < this->matrixWidth ? wLeft + widthBucket1 : this->matrixWidth;
+            auto wRight = wLeft + widthBucket1 < infoArg->processNum ? wLeft + widthBucket1 : infoArg->processNum;
             auto w = wRight - wLeft;
             //////////// Compute random locations (transposed) ////////////////
-            this->commonPrng->get((u8 *)&commonKey, sizeof(block));
-            commonAesFkey.setKey(commonKey);
-            for (auto low = 0; low < this->senderSize; low += bucket1)
+            // this->commonPrng->get((u8 *)&commonKey, sizeof(block));
+            AES commonAesFkey;
+            commonAesFkey.setKey(infoArg->aesComKeys[cycTimes]);
+            // infoArg->currThreadAesFkey[cycTimes].setKey(commonKey);
+            // #pragma omp parallel for num_threads(8)
+            for (auto low = 0; low < senderSize; low += bucket1)
             {
-                auto up = low + bucket1 < this->senderSize ? low + bucket1 : this->senderSize;
-                commonAesFkey.ecbEncBlocks(this->sendSet + low, up - low, randomLocations);
+                auto up = low + bucket1 < senderSize ? low + bucket1 : senderSize;
+                commonAesFkey.ecbEncBlocks(infoArg->sendset + low, up - low, randomLocations);
                 for (auto i = 0; i < w; ++i)
                 {
                     for (auto j = low; j < up; ++j)
@@ -652,54 +797,337 @@ namespace osuCrypto
                     }
                 }
             }
-            // cout << "***********************11......" << endl;
+            // printf("===>>update aes一次transLocations用时:%ldms\n", get_use_time(start22));
             //////////////// Extend OTs and compute matrix C ///////////////////
             // u8 *recvMatrix;
-            u64 offset1 = wLeft * this->heightInBytes;
+            u64 offset1 = wLeft * heightInBytes;
             u64 offset2 = 0;
+            // long startOts = start_time();
             for (auto i = 0; i < w; ++i)
             {
-                PRNG prng(this->recoverMsgWidthOutput[i + wLeft]);
-                prng.get(matrixC[i], this->heightInBytes);
-                if (this->choicesWidthInput[i + wLeft])
+                PRNG prng(infoArg->recoverMsgWidthOutputPtr[i + wLeft]);
+                prng.get(matrixC[i], heightInBytes);
+                if (infoArg->choicesWidthInputPtr[i + wLeft])
                 {
                     for (auto j = 0; j < heightInBytes; ++j)
                     {
-                        matrixC[i][j] ^= (recvMatrixADBuff + offset1 + offset2)[j];
+                        matrixC[i][j] ^= (infoArg->recvMatrixADBuffBegin + offset1 + offset2)[j];
                     }
                 }
-                offset2 += this->heightInBytes;
+                offset2 += heightInBytes;
             }
+            // printf("===>>>计算compute matrix C用时：%ldms\n", get_use_time(startOts));
             // cout << "***********************22......" << endl;
             ///////////////// Compute hash inputs (transposed) /////////////////////
+            // long startInput = start_time();
             for (auto i = 0; i < w; ++i)
             {
                 // cout << "***********************33......" << endl;
                 for (auto j = 0; j < senderSize; ++j)
                 {
                     auto location =
-                        (*(u32 *)(transLocations[i] + j * locationInBytes)) & shift;
-                    this->transHashInputs[i + wLeft][j >> 3] |=
+                        (*(u32 *)(transLocations[i] + j * locationInBytes)) & (infoArg->shift);
+                    infoArg->transHashInputsPtr[i + wLeft][j >> 3] |=
                         (u8)((bool)(matrixC[i][location >> 3] & (1 << (location & 7))))
                         << (j & 7);
                 }
             }
+            // printf("===>>>计算一次hashInput用时：%ldms\n", get_use_time(startInput));
         }
         /****cycle end ****/
         //**************释放内存*************//
-        cout << "***********************before cycle end" << endl;
-        printf("=====>>cycle 用时：%ldms\n", get_use_time(start1));
+        // cout << "***********************before cycle end" << endl;
+        // printf("===>>cycle 用时：%ldms\n", get_use_time(start1));
+        // printf("===>>cycNum:%d\n", cycNum);
+        // long start33 = start_time();
+        // #pragma omp parallel for num_threads(4)
         for (auto i = 0; i < widthBucket1; ++i)
         {
             delete[] transLocations[i];
             delete[] matrixC[i];
-            // printf(">>>>>>>>>i:%d,widthBucket1:%d\n", i, widthBucket1);
         }
-        delete[] this->sendSet;
-        delete this->commonPrng;
+        // delete[] this->sendSet;
+        // delete this->commonPrng;
+        // printf("===>>delete 释放内存用时:%dms\n", get_use_time(start33));
+        // printf(">>>>>>>>>> sendSet,end\n");
+        // return 0;
+    }
+
+    int PsiSender::recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize)
+    {
+        auto locationInBytes = (this->logHeight + 7) / 8;    // logHeight==1
+        auto widthBucket1 = sizeof(block) / locationInBytes; // 16/1
+        u64 shift = (1 << this->logHeight) - 1;              //全1
+        printf("===>>widthBucket1:%ld(16/loc),locationInBytes:%ld\n", widthBucket1, locationInBytes);
+        ////////////// Initialization //////////////////////
+        // PRNG commonPrng(this->commonSeed);
+        // bucket1 = bucket2 = 1 << 8;  // 256
+        if (recvMatixADBuffSize != this->matrixWidth * this->heightInBytes)
+        {
+            return -111;
+        }
+        // u8 *transHashInputs[this->matrixWidth]; // width==60，矩阵宽度
+        cout << "***********************before cycle" << endl;
+        // block commonKey;
+        // AES commonAesFkey;
+        /****cycle start***/
+        long start1 = start_time();
+        long start22;
+        // int cycNum = 0; //128/5=25...3
+        int threadNum = 1;
+        u64 sumCount = 0;
+        int isExit = 0;
+        RecoverMatrixCInfo infoArgs[threadNum];
+        memset((char *)infoArgs, 0, threadNum * sizeof(RecoverMatrixCInfo));
+        //对每个线程进行分配处理的矩阵的列数
+        for (;;)
+        {
+            for (int k = 0; k < threadNum; k++)
+            {
+                int wRight = sumCount + widthBucket1;
+                if (wRight <= this->matrixWidth)
+                {
+                    //3
+                    infoArgs[k].processNum += widthBucket1;
+                    //4
+                    infoArgs[k].aesKeyNum++;
+                }
+                else
+                {
+                    isExit = 1;
+                    break;
+                }
+                sumCount += widthBucket1;
+            }
+            if (isExit)
+            {
+                break;
+            }
+        }
+        printf("sumCount:=%d\n", sumCount);
+        if ((this->matrixWidth - sumCount) != 0)
+        {
+            infoArgs[threadNum - 1].processNum += this->matrixWidth - sumCount;
+            infoArgs[threadNum - 1].aesKeyNum += 1;
+        }
+        for (int i = 0; i < threadNum; i++)
+        {
+            printf("procesNum[%2d]=:%2d,", i, infoArgs[i].processNum);
+        }
+        cout << endl;
+        for (int i = 0; i < threadNum; i++)
+        {
+            printf("aesKeyNum[%2d]=:%2d,", i, infoArgs[i].aesKeyNum);
+        }
+        //分配处理的矩阵的列数结束
+        //最重要的一步，生成Fk函数的keys
+        vector<block> commonKeys;
+        for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
+        {
+            block comKey;
+            this->commonPrng->get((u8 *)&comKey, sizeof(block));
+            commonKeys.push_back(comKey);
+        }
+        printf("\n===>>commonKeys size:%ld\n", commonKeys.size());
+        //最重要的一步，取出 choicesWidthInput
+        u64 choiceSize = this->choicesWidthInput.size();
+        printf("===>choiceSizze:%ld\n", choiceSize);
+        cout << "===>choicesWidthInput:" << this->choicesWidthInput << endl;
+        vector<int> choiceVector;
+        printf("===>choiceVector:");
+        for (int i = 0; i < choiceSize; i++)
+        {
+            choiceVector.push_back(this->choicesWidthInput[i]);
+            printf("%d,", choiceVector[i]);
+        }
+
+        //给参数赋值
+        for (int k = 0; k < threadNum; k++)
+        {
+            infoArgs[k].threadId = k;
+            //1
+            infoArgs[k].shift = shift;
+            if (k == 0)
+            {
+                //2
+                infoArgs[k].wLeftBegin = 0;
+                //5
+                infoArgs[k].aesComkeysBegin = 0;
+            }
+            else
+            {
+                infoArgs[k].wLeftBegin = infoArgs[k - 1].wLeftBegin + infoArgs[k - 1].processNum;
+                infoArgs[k].aesComkeysBegin = infoArgs[k - 1].aesComkeysBegin + infoArgs[k - 1].aesKeyNum;
+            }
+            //7
+            infoArgs[k].senderSize = this->senderSize;
+            //8
+            infoArgs[k].heightInBytes = this->heightInBytes;
+            //9
+            infoArgs[k].locationInBytes = locationInBytes;
+            //10
+            infoArgs[k].bucket1 = this->bucket1;
+            //11
+            infoArgs[k].widthBucket1 = widthBucket1;
+            //6
+            infoArgs[k].aesComKeys = (block *)(commonKeys.data()) + infoArgs[k].aesComkeysBegin;
+            //12
+            infoArgs[k].sendset = this->sendSet;
+            //13
+            infoArgs[k].recoverMsgWidthOutputPtr = this->recoverMsgWidthOutput.data() + infoArgs[k].wLeftBegin;
+            //14
+            infoArgs[k].choicesWidthInputPtr = choiceVector.data() + infoArgs[k].wLeftBegin; //todo
+            //15
+            infoArgs[k].recvMatrixADBuffBegin = recvMatrixADBuff + infoArgs[k].wLeftBegin * this->heightInBytes;
+            //16
+            infoArgs[k].transHashInputsPtr = (vector<u8> *)(this->transHashInputs.data()) + infoArgs[k].wLeftBegin;
+        }
+        printf("\n");
+        for (int i = 0; i < threadNum; i++)
+        {
+            printf("aesBegin[%2d]:%2ld,", i, infoArgs[i].aesComkeysBegin);
+            // printf("wlfBegin:%2d,", infoArgs[i].wLeftBegin);
+        }
+        printf("\n");
+        for (int j = 0; j < threadNum; j++)
+        {
+            // printf("\n%d##########\n", j);
+            printf("wlfBegin:%2ld,", infoArgs[j].wLeftBegin);
+        }
+        printf("\n========参数准备结束======\n");
+        // sleep(1000);
+        printf("========开始并行处理恢复矩阵C,threadNum(%d)========\n", threadNum);
+
+#pragma omp parallel for num_threads(threadNum)
+        for (int i = 0; i < threadNum; i++)
+        {
+            process_recover_matrix_C(infoArgs + i);
+        }
+        /****cycle end ****/
+        //**************释放内存*************//
+        cout << "***********************before cycle end" << endl;
+        printf("===>>cycle 用时：%ldms\n", get_use_time(start1));
         printf(">>>>>>>>>> sendSet,end\n");
         return 0;
     }
+
+    // int PsiSender::recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize)
+    // {
+    //     auto locationInBytes = (this->logHeight + 7) / 8;    // logHeight==1
+    //     auto widthBucket1 = sizeof(block) / locationInBytes; // 16/1
+    //     u64 shift = (1 << this->logHeight) - 1;              //全1
+    //     printf("===>>widthBucket1:%ld(16/loc),locationInBytes:%ld\n", widthBucket1, locationInBytes);
+    //     ////////////// Initialization //////////////////////
+    //     // PRNG commonPrng(this->commonSeed);
+    //     u8 *transLocations[widthBucket1]; // 16个u8*
+
+    //     if (recvMatixADBuffSize != this->matrixWidth * this->heightInBytes)
+    //     {
+    //         return -111;
+    //     }
+    //     for (auto i = 0; i < widthBucket1; ++i)
+    //     {
+    //         // 256*1+4，每个元素为u8*，下面语句为创建一个u8*,260个u8
+    //         transLocations[i] = new u8[this->senderSize * locationInBytes + sizeof(u32)];
+    //     }
+    //     // auto tn = senderSize * locationInBytes + sizeof(u32);
+    //     // cout << "####transLocations中每一列的字节数：" << tn << "\n";
+    //     // bucket1 = bucket2 = 1 << 8;  // 256
+    //     block randomLocations[this->bucket1]; // 256个block
+    //     u8 *matrixC[widthBucket1];            // 16
+    //     for (auto i = 0; i < widthBucket1; ++i)
+    //     {
+    //         matrixC[i] = new u8[this->heightInBytes]; // 32
+    //     }
+    //     // u8 *transHashInputs[this->matrixWidth]; // width==60，矩阵宽度
+
+    //     cout << "***********************before cycle" << endl;
+    //     block commonKey;
+    //     // AES commonAesFkey;
+    //     //cycle start
+    //     long start1 = start_time();
+    //     long start22;
+    //     int cycNum = 0; //128/5=25...3
+    //     for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
+    //     {
+    //         cycNum++;
+    //         auto wRight = wLeft + widthBucket1 < this->matrixWidth ? wLeft + widthBucket1 : this->matrixWidth;
+    //         auto w = wRight - wLeft;
+    //         //////////// Compute random locations (transposed) ////////////////
+    //         this->commonPrng->get((u8 *)&commonKey, sizeof(block));
+    //         AES commonAesFkey;
+    //         commonAesFkey.setKey(commonKey);
+    //         start22 = start_time();
+    //         // #pragma omp parallel for num_threads(8)
+    //         for (auto low = 0; low < this->senderSize; low += bucket1)
+    //         {
+    //             auto up = low + bucket1 < this->senderSize ? low + bucket1 : this->senderSize;
+    //             commonAesFkey.ecbEncBlocks(this->sendSet + low, up - low, randomLocations);
+    //             for (auto i = 0; i < w; ++i)
+    //             {
+    //                 for (auto j = low; j < up; ++j)
+    //                 {
+    //                     memcpy(transLocations[i] + j * locationInBytes,
+    //                            (u8 *)(randomLocations + (j - low)) + i * locationInBytes,
+    //                            locationInBytes);
+    //                 }
+    //             }
+    //         }
+    //         printf("===>>update aes一次transLocations用时:%ldms\n", get_use_time(start22));
+    //         //////////////// Extend OTs and compute matrix C ///////////////////
+    //         // u8 *recvMatrix;
+    //         u64 offset1 = wLeft * this->heightInBytes;
+    //         u64 offset2 = 0;
+    //         long startOts = start_time();
+    //         for (auto i = 0; i < w; ++i)
+    //         {
+    //             PRNG prng(this->recoverMsgWidthOutput[i + wLeft]);
+    //             prng.get(matrixC[i], this->heightInBytes);
+    //             if (this->choicesWidthInput[i + wLeft])
+    //             {
+    //                 for (auto j = 0; j < heightInBytes; ++j)
+    //                 {
+    //                     matrixC[i][j] ^= (recvMatrixADBuff + offset1 + offset2)[j];
+    //                 }
+    //             }
+    //             offset2 += this->heightInBytes;
+    //         }
+    //         printf("===>>>计算compute matrix C用时：%ldms\n", get_use_time(startOts));
+    //         ///////////////// Compute hash inputs (transposed) /////////////////////
+    //         long startInput = start_time();
+    //         for (auto i = 0; i < w; ++i)
+    //         {
+    //             // cout << "***********************33......" << endl;
+    //             for (auto j = 0; j < senderSize; ++j)
+    //             {
+    //                 auto location =
+    //                     (*(u32 *)(transLocations[i] + j * locationInBytes)) & shift;
+    //                 this->transHashInputs[i + wLeft][j >> 3] |=
+    //                     (u8)((bool)(matrixC[i][location >> 3] & (1 << (location & 7))))
+    //                     << (j & 7);
+    //             }
+    //         }
+    //         printf("===>>>计算一次hashInput用时：%ldms\n", get_use_time(startInput));
+    //     }
+    //     //cycle end
+    //     //释放内存
+    //     cout << "***********************before cycle end" << endl;
+    //     printf("===>>cycle 用时：%ldms\n", get_use_time(start1));
+    //     printf("===>>cycNum:%d\n", cycNum);
+    //     long start33 = start_time();
+    //     // #pragma omp parallel for num_threads(4)
+    //     for (auto i = 0; i < widthBucket1; ++i)
+    //     {
+    //         delete[] transLocations[i];
+    //         delete[] matrixC[i];
+    //     }
+    //     delete[] this->sendSet;
+    //     delete this->commonPrng;
+    //     printf("===>>delete 释放内存用时:%dms\n", get_use_time(start33));
+    //     printf(">>>>>>>>>> sendSet,end\n");
+    //     return 0;
+    // }
+
     //
     int PsiSender::isSendEnd()
     {

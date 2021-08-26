@@ -1,5 +1,6 @@
 #include "iknpote.h"
 #include <unordered_map>
+#include <vector>
 namespace osuCrypto
 {
     // typedef unsigned long long u64_t;
@@ -40,7 +41,7 @@ namespace osuCrypto
 
     public:
         PsiSender();
-        // ~PsiSender();
+        ~PsiSender();
         //初始化psiSender
         int init(u8_t *commonSeed, u64_t senderSize, u64_t matrixWidth, u64_t logHeight,
                  u64_t hash2LengthInBytes = 10, u64_t bucket2ForComputeH2Output = 256);
@@ -92,6 +93,7 @@ namespace osuCrypto
         vector<u8> sendMatrixADBuff;
         vector<vector<u8>> transHashInputs;
         std::unordered_map<u64, std::vector<std::pair<block, u32_t>>> allHashes;
+        vector<unordered_map<u64, std::vector<std::pair<block, u32_t>>>> HashMapVector;
         IknpOtExtSender iknpOteSender;
         u64 lowL;
 
