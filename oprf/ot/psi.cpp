@@ -266,11 +266,162 @@ namespace osuCrypto
         return this->iknpOteSender.genPK0FromNpot(pubParamBuf, pubParamBufByteSize,
                                                   pk0Buf, pk0BufSize);
     }
+    //并行计算 MatrixAxorD
+    typedef struct ComputeMatrixAxorDInfo
+    {
+        int threadId;
+        //1
+        u64 shift;
+        //2
+        u64 wLeftBegin;
+        //3
+        u64 processNum;
+        //4
+        u64 aesKeyNum;
+        //5
+        u64 aesComkeysBegin;
+        //6
+        block *aesComKeys;
+        //7
+        u64 receiverSize;
+        //8
+        u64 heightInBytes;
+        //9
+        u64 locationInBytes;
+        //10
+        u64 bucket1;
+        //11
+        u64 widthBucket1;
+        //12
+        block *recvSet;
+        //13
+        array<block, 2> *encMsgOutputPtr;
+        //15
+        const u8 *recvMatrixADBuffBegin;
+        //16
+        vector<u8> *transHashInputsPtr;
+        //17
+        u8 *sendMatrixADBuff;
+    } ComputeMatrixAxorDInfo;
+    //并行计算矩阵AxorD
+    void process_compute_Matrix_AxorD(ComputeMatrixAxorDInfo *infoArg)
+    {
+        int cycTimes = 0;
+        u64 bucket1 = infoArg->bucket1;
+        u64 widthBucket1 = infoArg->widthBucket1;
+        u64 heightInBytes = infoArg->heightInBytes;
+        u64 locationInBytes = infoArg->locationInBytes;
+        u64 receiverSize = infoArg->receiverSize;
+        block randomLocations[bucket1]; // 256block
+        u8 *transLocations[widthBucket1];
+        for (auto i = 0; i < widthBucket1; ++i)
+        {
+            transLocations[i] = new u8[receiverSize * locationInBytes + sizeof(u32)];
+        }
+        u8 *matrixA[widthBucket1];
+        u8 *matrixDelta[widthBucket1];
+        for (auto i = 0; i < widthBucket1; ++i)
+        {
+            matrixA[i] = new u8[heightInBytes]; //要释放
+            matrixDelta[i] = new u8[heightInBytes];
+        }
+        for (auto wLeft = 0; wLeft < infoArg->processNum; wLeft += widthBucket1, cycTimes++)
+        {
+            auto wRight = wLeft + widthBucket1 < infoArg->processNum ? wLeft + widthBucket1 : infoArg->processNum;
+            auto w = wRight - wLeft;
+            //////////// Compute random locations (transposed) ////////////////
+            // commonPrng.get((u8 *)&commonKey, sizeof(block));
+            AES commonAesFkey;
+            commonAesFkey.setKey(infoArg->aesComKeys[cycTimes]);
+            for (auto low = 0; low < receiverSize; low += bucket1)
+            {
+                auto up = low + bucket1 < receiverSize ? low + bucket1 : receiverSize;
+                //每256个输入处理一次，randomLocations==256blocks,Fk函数，Fk(H1(y))
+                commonAesFkey.ecbEncBlocks(infoArg->recvSet + low, up - low, randomLocations);
+                //如果w比较宽，这里的计算会增加
+                for (auto i = 0; i < w; ++i)
+                {
+                    for (auto j = low; j < up; ++j)
+                    {
+                        // randomLocations,256个block
+                        memcpy(transLocations[i] + j * locationInBytes,
+                               (u8 *)(randomLocations + (j - low)) + i * locationInBytes,
+                               locationInBytes);
+                    }
+                }
+            }
+            //////////// Compute matrix Delta /////////////////////////////////
+            //对应论文中的P2(接收者)
+            for (auto i = 0; i < widthBucket1; ++i)
+            {
+                memset(matrixDelta[i], 255, heightInBytes);
+                // heightInBytes，置为全1矩阵
+            }
+            //本方拥有的数据y的个数
+            for (auto i = 0; i < w; ++i)
+            {
+                for (auto j = 0; j < receiverSize; ++j)
+                {
+                    auto location =
+                        (*(u32 *)(transLocations[i] + j * locationInBytes)) & (infoArg->shift);
+                    // shift全1
+                    // location >> 3(除以8)表示matrixDelta[i]的字节位置
+                    // location & 0b0111,取出低3位；(location & 7)==0,1,2,3,4,5,6,7
+                    matrixDelta[i][location >> 3] &= ~(1 << (location & 7));
+                }
+            }
+            //////////////// Compute matrix A & sent matrix ///////////////////////
+            // u8 *sentMatrix[w];
+            u64 offset1 = wLeft * heightInBytes;
+            u64 offset2 = 0;
+            for (auto i = 0; i < w; ++i)
+            {
+                PRNG prng(infoArg->encMsgOutputPtr[i + wLeft][0]);
+                prng.get(matrixA[i], heightInBytes);
+                prng.SetSeed(infoArg->encMsgOutputPtr[i + wLeft][1]);
+                // prng.get(sentMatrix[i], this->heightInBytes);
+                prng.get(infoArg->sendMatrixADBuff + offset1 + offset2, heightInBytes);
+                for (auto j = 0; j < heightInBytes; ++j)
+                {
+                    // sentMatrix[i][j] ^= matrixA[i][j] ^ matrixDelta[i][j];
+                    (infoArg->sendMatrixADBuff + offset1 + offset2)[j] ^= matrixA[i][j] ^ matrixDelta[i][j];
+                }
+                //发送sM^A^D
+                //发送数据U^A^D给对方，
+                // ch.asyncSend(sentMatrix[i], heightInBytes);
+                //偏移计算
+                offset2 += heightInBytes;
+            }
+            ///////////////// Compute hash inputs (transposed) /////////////////////
+            for (auto i = 0; i < w; ++i)
+            {
+                for (auto j = 0; j < receiverSize; ++j)
+                {
+                    auto location =
+                        (*(u32 *)(transLocations[i] + j * locationInBytes)) & (infoArg->shift);
+                    infoArg->transHashInputsPtr[i + wLeft][j >> 3] |=
+                        (u8)((bool)(matrixA[i][location >> 3] & (1 << (location & 7))))
+                        << (j & 7);
+                }
+            }
+        }
+        // 最后释放空间
+        for (auto i = 0; i < widthBucket1; ++i)
+        {
+            delete[] matrixA[i];
+            matrixA[i] = nullptr;
+            delete[] matrixDelta[i];
+            matrixDelta[i] = nullptr;
+            delete[] transLocations[i];
+            transLocations[i] = nullptr;
+        }
+    }
     int PsiReceiver::getSendMatrixADBuff(const u8_t *uBuffInput, const u64_t uBuffInputSize,
                                          const vector<vector<u8_t>> receiverSet,
                                          u8_t **sendMatrixADBuff, u64_t *sendMatixADBuffSize)
     {
         int ublocksize = uBuffInputSize / sizeof(block);
+        printf("===>>收到的TxorR矩阵的字节大小:%ld,转化成block大小为:%ld\n", uBuffInputSize, ublocksize);
         vector<block> uBuffInputBlock(ublocksize);
         block *begin = (block *)uBuffInput;
         for (int i = 0; i < ublocksize; i++)
@@ -325,6 +476,120 @@ namespace osuCrypto
         ////////// Transform input end //////////////////
         /*********for cycle start*********/
         printf("===>>widthBucket1(16/loc):%d,locationInBytes:%d\n", widthBucket1, locationInBytes);
+        //并行计算矩阵AxorD
+        int threadNum = this->threadNumOmp;
+        int sumCount = 0;
+        int isExit = 0;
+        ComputeMatrixAxorDInfo infoArgs[threadNum];
+        //为每一个线程生成参数数据,主要是处理的矩阵的列数
+        for (;;)
+        {
+            for (int k = 0; k < threadNum; k++)
+            {
+                int wRight = sumCount + widthBucket1;
+                if (wRight <= this->matrixWidth)
+                {
+                    //3
+                    infoArgs[k].processNum += widthBucket1;
+                    //4
+                    infoArgs[k].aesKeyNum++;
+                }
+                else
+                {
+                    isExit = 1;
+                    break;
+                }
+                sumCount += widthBucket1;
+            }
+            if (isExit)
+            {
+                break;
+            }
+        }
+        printf("sumCount:=%d\n", sumCount);
+        //不要漏掉余数
+        if ((this->matrixWidth - sumCount) != 0)
+        {
+            infoArgs[threadNum - 1].processNum += this->matrixWidth - sumCount;
+            infoArgs[threadNum - 1].aesKeyNum += 1;
+        }
+        for (int i = 0; i < threadNum; i++)
+        {
+            printf("procesNum[%2d]=:%2d,", i, infoArgs[i].processNum);
+        }
+        cout << endl;
+        for (int i = 0; i < threadNum; i++)
+        {
+            printf("aesKeyNum[%2d]=:%2d,", i, infoArgs[i].aesKeyNum);
+        }
+        //分配处理的矩阵的列数结束
+        //最重要的一步，生成Fk函数的keys
+        vector<block> commonKeys;
+        for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
+        {
+            block comKey;
+            commonPrng.get((u8 *)&comKey, sizeof(block));
+            commonKeys.push_back(comKey);
+        }
+        printf("\n===>>commonKeys size:%ld\n", commonKeys.size());
+        //给参数赋值
+        for (int k = 0; k < threadNum; k++)
+        {
+            infoArgs[k].threadId = k;
+            //1
+            infoArgs[k].shift = shift;
+            if (k == 0)
+            {
+                //2
+                infoArgs[k].wLeftBegin = 0;
+                //5
+                infoArgs[k].aesComkeysBegin = 0;
+            }
+            else
+            {
+                infoArgs[k].wLeftBegin = infoArgs[k - 1].wLeftBegin + infoArgs[k - 1].processNum;
+                infoArgs[k].aesComkeysBegin = infoArgs[k - 1].aesComkeysBegin + infoArgs[k - 1].aesKeyNum;
+            }
+            //7
+            infoArgs[k].receiverSize = this->receiverSize;
+            //8
+            infoArgs[k].heightInBytes = this->heightInBytes;
+            //9
+            infoArgs[k].locationInBytes = locationInBytes;
+            //10
+            infoArgs[k].bucket1 = this->bucket1;
+            //11
+            infoArgs[k].widthBucket1 = widthBucket1;
+            //6
+            infoArgs[k].aesComKeys = (block *)(commonKeys.data()) + infoArgs[k].aesComkeysBegin;
+            //12
+            infoArgs[k].recvSet = recvSet;
+            //13
+            infoArgs[k].encMsgOutputPtr = (array<block, 2> *)(this->encMsgOutput.data()) + infoArgs[k].wLeftBegin;
+            //16
+            infoArgs[k].transHashInputsPtr = (vector<u8> *)(this->transHashInputs.data()) + infoArgs[k].wLeftBegin;
+            //17
+            infoArgs[k].sendMatrixADBuff = this->sendMatrixADBuff.data() + infoArgs[k].wLeftBegin;
+        }
+        printf("\n");
+        for (int i = 0; i < threadNum; i++)
+        {
+            printf("aesBegin[%2d]:%2ld,", i, infoArgs[i].aesComkeysBegin);
+        }
+        printf("\n");
+        for (int j = 0; j < threadNum; j++)
+        {
+            printf("wlfBegin[%2ld]:%2ld,", infoArgs[j].wLeftBegin);
+        }
+        printf("\n========参数准备结束======\n");
+        printf("========开始并行处理恢复矩阵C,threadNum(%d)========\n", threadNum);
+
+        //omp process
+#pragma omp parallel for num_threads(threadNum)
+        for (int i = 0; i < threadNumOmp; i++)
+        {
+            process_compute_Matrix_AxorD(infoArgs + i);
+        }
         for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
         {
             auto wRight = wLeft + widthBucket1 < this->matrixWidth ? wLeft + widthBucket1 : this->matrixWidth;
@@ -389,7 +654,7 @@ namespace osuCrypto
                 //发送数据U^A^D给对方，
                 // ch.asyncSend(sentMatrix[i], heightInBytes);
                 //偏移计算
-                offset2 += this->heightInBytes;
+                offset2 += heightInBytes;
             }
             ///////////////// Compute hash inputs (transposed) /////////////////////
             for (auto i = 0; i < w; ++i)
@@ -404,7 +669,7 @@ namespace osuCrypto
                 }
             }
         }
-        // long useTimeCycle = getEndTime(timeCompute);
+
         printf("===>>计算H1之后,生成矩阵A,D用时:%ldms\n", get_use_time(start0));
         /*********for cycle end*********/
         //将uBuff输出并发送给对方
@@ -425,6 +690,167 @@ namespace osuCrypto
         recvSet = nullptr;
         return 0;
     }
+
+    // int PsiReceiver::getSendMatrixADBuff(const u8_t *uBuffInput, const u64_t uBuffInputSize,
+    //                                      const vector<vector<u8_t>> receiverSet,
+    //                                      u8_t **sendMatrixADBuff, u64_t *sendMatixADBuffSize)
+    // {
+    //     int ublocksize = uBuffInputSize / sizeof(block);
+    //     vector<block> uBuffInputBlock(ublocksize);
+    //     block *begin = (block *)uBuffInput;
+    //     for (int i = 0; i < ublocksize; i++)
+    //     {
+    //         uBuffInputBlock[i] = *(begin + i);
+    //     }
+    //     //生成encmsgoutput
+    //     int fg = this->iknpOteSender.getEncMsg(uBuffInputBlock, this->encMsgOutput);
+    //     if (fg != 0)
+    //     {
+    //         return fg;
+    //     }
+    //     //psi begin
+    //     // u32 locationInBytes = (this->logHeight + 7) / 8;
+    //     u64 locationInBytes = (this->logHeight + 7) >> 3;
+    //     u64 widthBucket1 = sizeof(block) / locationInBytes;
+    //     u64 shift = (1 << this->logHeight) - 1; //全1
+    //     //////////// Initialization ///////////////////
+    //     PRNG commonPrng(this->commonSeed);
+    //     block commonKey;
+    //     AES commonAes;
+    //     u8 *matrixA[widthBucket1];
+    //     u8 *matrixDelta[widthBucket1];
+    //     for (auto i = 0; i < widthBucket1; ++i)
+    //     {
+    //         matrixA[i] = new u8[this->heightInBytes]; //要释放
+    //         matrixDelta[i] = new u8[this->heightInBytes];
+    //     }
+    //     // u64 receiverSize = receiverSet.size();
+    //     // u64 receiverSizeInBytes = (receiverSize + 7) / 8;
+    //     // u64 receiverSizeInBytes = (receiverSize + 7) >> 3;
+    //     if (receiverSet.size() != this->receiverSize)
+    //     {
+    //         return -111;
+    //     }
+    //     u8 *transLocations[widthBucket1];
+    //     for (auto i = 0; i < widthBucket1; ++i)
+    //     {
+    //         transLocations[i] = new u8[this->receiverSize * locationInBytes + sizeof(u32)];
+    //     }
+    //     block randomLocations[this->bucket1]; // 256block
+    //     /////////// Transform input /////////////////////
+    //     commonPrng.get((u8 *)&commonKey, sizeof(block));
+    //     commonAes.setKey(commonKey);
+    //     block *recvSet = new block[receiverSize];
+    //     // void *timeCompute = newTimeCompute();
+    //     // startTime(timeCompute);
+    //     long start0 = start_time();
+    //     transformInputByH1(commonAes, this->h1LengthInBytes, receiverSet, recvSet, this->threadNumOmp);
+    //     // long useTimeH1 = getEndTime(timeCompute);
+    //     printf("===>>计算H1用时:%ldms\n", get_use_time(start0));
+    //     ////////// Transform input end //////////////////
+    //     /*********for cycle start*********/
+    //     printf("===>>widthBucket1(16/loc):%d,locationInBytes:%d\n", widthBucket1, locationInBytes);
+    //     for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
+    //     {
+    //         auto wRight = wLeft + widthBucket1 < this->matrixWidth ? wLeft + widthBucket1 : this->matrixWidth;
+    //         auto w = wRight - wLeft;
+    //         //////////// Compute random locations (transposed) ////////////////
+    //         commonPrng.get((u8 *)&commonKey, sizeof(block));
+    //         commonAes.setKey(commonKey);
+    //         for (auto low = 0; low < receiverSize; low += this->bucket1)
+    //         {
+    //             auto up = low + this->bucket1 < receiverSize ? low + this->bucket1 : receiverSize;
+    //             //每256个输入处理一次，randomLocations==256blocks,Fk函数，Fk(H1(y))
+    //             commonAes.ecbEncBlocks(recvSet + low, up - low, randomLocations);
+    //             //如果w比较宽，这里的计算会增加
+    //             for (auto i = 0; i < w; ++i)
+    //             {
+    //                 for (auto j = low; j < up; ++j)
+    //                 {
+    //                     // randomLocations,256个block
+    //                     memcpy(transLocations[i] + j * locationInBytes,
+    //                            (u8 *)(randomLocations + (j - low)) + i * locationInBytes,
+    //                            locationInBytes);
+    //                 }
+    //             }
+    //         }
+    //         //////////// Compute matrix Delta /////////////////////////////////
+    //         //对应论文中的P2(接收者)
+    //         for (auto i = 0; i < widthBucket1; ++i)
+    //         {
+    //             memset(matrixDelta[i], 255, this->heightInBytes);
+    //             // heightInBytes，置为全1矩阵
+    //         }
+    //         //本方拥有的数据y的个数
+    //         for (auto i = 0; i < w; ++i)
+    //         {
+    //             for (auto j = 0; j < receiverSize; ++j)
+    //             {
+    //                 auto location =
+    //                     (*(u32 *)(transLocations[i] + j * locationInBytes)) & shift;
+    //                 // shift全1
+    //                 // location >> 3(除以8)表示matrixDelta[i]的字节位置
+    //                 // location & 0b0111,取出低3位；(location & 7)==0,1,2,3,4,5,6,7
+    //                 matrixDelta[i][location >> 3] &= ~(1 << (location & 7));
+    //             }
+    //         }
+    //         //////////////// Compute matrix A & sent matrix ///////////////////////
+    //         // u8 *sentMatrix[w];
+    //         u64 offset1 = wLeft * this->heightInBytes;
+    //         u64 offset2 = 0;
+    //         for (auto i = 0; i < w; ++i)
+    //         {
+    //             PRNG prng(this->encMsgOutput[i + wLeft][0]);
+    //             prng.get(matrixA[i], this->heightInBytes);
+    //             prng.SetSeed(this->encMsgOutput[i + wLeft][1]);
+    //             // prng.get(sentMatrix[i], this->heightInBytes);
+    //             prng.get(this->sendMatrixADBuff.data() + offset1 + offset2, this->heightInBytes);
+    //             for (auto j = 0; j < this->heightInBytes; ++j)
+    //             {
+    //                 // sentMatrix[i][j] ^= matrixA[i][j] ^ matrixDelta[i][j];
+    //                 (this->sendMatrixADBuff.data() + offset1 + offset2)[j] ^= matrixA[i][j] ^ matrixDelta[i][j];
+    //             }
+    //             //发送sM^A^D
+    //             //发送数据U^A^D给对方，
+    //             // ch.asyncSend(sentMatrix[i], heightInBytes);
+    //             //偏移计算
+    //             offset2 += this->heightInBytes;
+    //         }
+    //         ///////////////// Compute hash inputs (transposed) /////////////////////
+    //         for (auto i = 0; i < w; ++i)
+    //         {
+    //             for (auto j = 0; j < receiverSize; ++j)
+    //             {
+    //                 auto location =
+    //                     (*(u32 *)(transLocations[i] + j * locationInBytes)) & shift;
+    //                 this->transHashInputs[i + wLeft][j >> 3] |=
+    //                     (u8)((bool)(matrixA[i][location >> 3] & (1 << (location & 7))))
+    //                     << (j & 7);
+    //             }
+    //         }
+    //     }
+    //     // long useTimeCycle = getEndTime(timeCompute);
+    //     printf("===>>计算H1之后,生成矩阵A,D用时:%ldms\n", get_use_time(start0));
+    //     /*********for cycle end*********/
+    //     //将uBuff输出并发送给对方
+    //     *sendMatrixADBuff = this->sendMatrixADBuff.data();
+    //     *sendMatixADBuffSize = this->heightInBytes * this->matrixWidth;
+    //     /****************************/
+    //     // 最后释放空间
+    //     for (auto i = 0; i < widthBucket1; ++i)
+    //     {
+    //         delete[] matrixA[i];
+    //         matrixA[i] = nullptr;
+    //         delete[] matrixDelta[i];
+    //         matrixDelta[i] = nullptr;
+    //         delete[] transLocations[i];
+    //         transLocations[i] = nullptr;
+    //     }
+    //     delete[] recvSet;
+    //     recvSet = nullptr;
+    //     return 0;
+    // }
+
     //将sendMatrixADBuff发送给对方之后，接下来生成AllHashMap
     //并行处理
     typedef struct HashMapParallelInfo
@@ -1002,7 +1428,7 @@ namespace osuCrypto
         printf("\n");
         for (int j = 0; j < threadNum; j++)
         {
-            printf("wlfBegin:%2ld,", infoArgs[j].wLeftBegin);
+            printf("wlfBegin[%2ld]:%2ld,", infoArgs[j].wLeftBegin);
         }
         printf("\n========参数准备结束======\n");
         // sleep(1000);

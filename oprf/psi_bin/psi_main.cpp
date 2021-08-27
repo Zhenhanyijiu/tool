@@ -419,8 +419,10 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64
     //计算H1 end
     //[4]接收MatrixAxorD,生成矩阵C
     char *matrixAxorD = nullptr;
+    long start_recv_AD = start_time();
     n = recv_data(client, &matrixAxorD);
     assert(n > 0);
+    printf("send:收到matrix AxorD用时:%d ms\n", get_use_time(start_recv_AD));
     //恢复矩阵C
     long start3 = start_time();
     fg = psiSender.recoverMatrixC((oc::u8 *)matrixAxorD, n);
@@ -518,7 +520,7 @@ int main(int argc, char **argv)
     int port = cmd.get<oc::u64>("port");
     printf("port:%d\n", port);
     //omp num
-    cmd.setDefault("omp", 8);
+    cmd.setDefault("omp", 1);
     int omp_num = cmd.get<oc::u64>("omp");
     printf("omp_num:%d\n", omp_num);
     if (!cmd.isSet("r"))
