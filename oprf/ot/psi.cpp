@@ -490,7 +490,7 @@ namespace osuCrypto
         RandomOracle H(this->hash2LengthInBytes);
         u8 hashOutput[sizeof(block)];
         u8 *hashInputs[this->bucket2ForComputeH2Output];
-        int threadNum = 4;
+        int threadNum = this->threadNumOmp;
         this->HashMapVector.resize(threadNum);
         u64 processLen = this->receiverSize / threadNum;
         u64 remain = this->receiverSize % threadNum;
@@ -798,7 +798,6 @@ namespace osuCrypto
             AES commonAesFkey;
             commonAesFkey.setKey(infoArg->aesComKeys[cycTimes]);
             // infoArg->currThreadAesFkey[cycTimes].setKey(commonKey);
-            // #pragma omp parallel for num_threads(8)
             for (auto low = 0; low < senderSize; low += bucket1)
             {
                 auto up = low + bucket1 < senderSize ? low + bucket1 : senderSize;
@@ -856,7 +855,6 @@ namespace osuCrypto
         // printf("===>>cycle 用时：%ldms\n", get_use_time(start1));
         // printf("===>>cycNum:%d\n", cycNum);
         // long start33 = start_time();
-        // #pragma omp parallel for num_threads(4)
         for (auto i = 0; i < widthBucket1; ++i)
         {
             delete[] transLocations[i];
@@ -1070,7 +1068,6 @@ namespace osuCrypto
     //         AES commonAesFkey;
     //         commonAesFkey.setKey(commonKey);
     //         start22 = start_time();
-    //         // #pragma omp parallel for num_threads(8)
     //         for (auto low = 0; low < this->senderSize; low += bucket1)
     //         {
     //             auto up = low + bucket1 < this->senderSize ? low + bucket1 : this->senderSize;
@@ -1127,7 +1124,6 @@ namespace osuCrypto
     //     printf("===>>cycle 用时：%ldms\n", get_use_time(start1));
     //     printf("===>>cycNum:%d\n", cycNum);
     //     long start33 = start_time();
-    //     // #pragma omp parallel for num_threads(4)
     //     for (auto i = 0; i < widthBucket1; ++i)
     //     {
     //         delete[] transLocations[i];

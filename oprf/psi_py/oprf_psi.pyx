@@ -19,7 +19,7 @@ cdef extern from "psi.h" namespace "osuCrypto":
     cdef cppclass PsiSender:
         PsiSender()except+
         int init(u8_t *commonSeed, u64_t senderSize, u64_t matrixWidth, u64_t logHeight,
-                 u64_t hash2LengthInBytes, u64_t bucket2ForComputeH2Output)
+                 int threadNum, u64_t hash2LengthInBytes, u64_t bucket2ForComputeH2Output)
         int genPublicParamFromNpot(u8_t ** pubParamBuf, u64_t *pubParamBufByteSize)
         int genMatrixTxorRBuff(u8_t *pk0Buf, const u64_t pk0BufSize,
                                u8_t ** uBuffOutputTxorR, u64_t *uBuffOutputSize)
@@ -30,8 +30,8 @@ cdef extern from "psi.h" namespace "osuCrypto":
 
     cdef cppclass PsiReceiver:
         PsiReceiver()except+
-        int init(u8_t *commonSeed, u64_t receiverSize, u64_t senderSize,
-                 u64_t matrixWidth, u64_t logHeight, u64_t hash2LengthInBytes,
+        int init(u8_t *commonSeed, u64_t receiverSize, u64_t senderSize, u64_t matrixWidth,
+                 u64_t logHeight, int threadNum, u64_t hash2LengthInBytes,
                  u64_t bucket2ForComputeH2Output)
         int genPK0FromNpot(u8_t *pubParamBuf, const u64_t pubParamBufByteSize,
                            u8_t ** pk0Buf, u64_t *pk0BufSize)
@@ -47,10 +47,12 @@ cdef extern from "psi.h" namespace "osuCrypto":
 cdef class OprfPsiReceiver:
     cdef PsiReceiver psi_receiver
     #common_seed:16字节的bytes，双方必须做到统一
-    def __init__(self, common_seed: bytes, receiver_size: int, sender_size: int, matrix_width: int = 128):
+    def __init__(self, common_seed: bytes, receiver_size: int, sender_size: int,
+                 matrix_width: int = 128, omp_thread_num: int = 1):
         if common_seed is None or len(common_seed) < 16:
             raise Exception('oprf psi receiver: param error')
-        cdef int ret = self.psi_receiver.init(common_seed, receiver_size, sender_size, matrix_width, 20, 10, 10240)
+        cdef int ret = self.psi_receiver.init(common_seed, receiver_size, sender_size, matrix_width,
+                                              20, omp_thread_num, 10, 10240)
         if ret != 0:
             raise Exception('oprf psi receiver: init error')
 
@@ -107,10 +109,12 @@ cdef class OprfPsiReceiver:
 cdef class OprfPsiSender(object):
     cdef PsiSender psi_sender
     #common_seed:16字节的bytes，双方必须做到统一
-    def __init__(self, common_seed: bytes, sender_size: int, matrix_width: int = 128):
+    def __init__(self, common_seed: bytes, sender_size: int, matrix_width: int = 128,
+                 omp_thread_num: int = 1):
         if common_seed is None or len(common_seed) < 16:
             raise Exception('oprf psi sender: param error')
-        cdef int ret = self.psi_sender.init(common_seed, sender_size, matrix_width, 20, 10, 10240)
+        cdef int ret = self.psi_sender.init(common_seed, sender_size, matrix_width, 20,
+                                            omp_thread_num, 10, 10240)
         if ret != 0:
             raise Exception('oprf psi sender: init error')
 

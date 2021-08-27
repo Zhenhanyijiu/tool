@@ -9,12 +9,13 @@ from Crypto.Cipher import AES
 
 
 class Receiver(object):
-    def __init__(self, common_deed: bytes, receiver_size: int, sender_size: int, matrix_width: int = 128):
+    def __init__(self, common_deed: bytes, receiver_size: int, sender_size: int,
+                 matrix_width: int = 128, omp_thread_num: int = 1):
         self.psi_msg_index = list()
         self.receiver_size = receiver_size
         self.sender_size = sender_size
-        self.PsiReceiver = OprfPsiReceiver(
-            common_deed, receiver_size, sender_size, matrix_width)
+        self.PsiReceiver = OprfPsiReceiver(common_deed, receiver_size, sender_size,
+                                           matrix_width, omp_thread_num)
 
     def gen_pk0s(self, public_param: bytes):
         return self.PsiReceiver.gen_pk0s(public_param)
@@ -138,11 +139,7 @@ def get_use_time(start: int) -> float:
     return (time.time_ns() - start) / 1e6
 
 
-if __name__ == '__main__':
-    receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
-    print('receiver_size, sender_size, psi_size, ip, port=',
-          receiver_size, sender_size, psi_size, ip, port)
-    print("===================")
+def recv_pro(receiver_size, sender_size, psi_size, ip, port):
     server = Server(ip, port)
     start0 = time.time_ns()
     receiver_set = server.test_gen_data_set(receiver_size, psi_size)
@@ -154,7 +151,7 @@ if __name__ == '__main__':
     # bytearray(b'1111111111111112')
     # 2. 创建接收方对象
     start1 = time.time_ns()
-    psi_recv = Receiver(common_seed, receiver_size, sender_size)
+    psi_recv = Receiver(common_seed, receiver_size, sender_size, omp_thread_num=4)
 
     # 3. 接收对方发来的公共参数public_param
     public_param = server.recv_data()
@@ -164,7 +161,7 @@ if __name__ == '__main__':
     server.send_data(pk0s)
     # 6.接收对方发来的matrix_TxorR，作为参数
     matrix_TxorR = server.recv_data()
-    # print('===>>matrix_TxorR:', matrix_TxorR, len(matrix_TxorR))
+    ### print('===>>matrix_TxorR:', matrix_TxorR, len(matrix_TxorR))
     # 7.生成矩阵matrix_A_xor_D
     start2 = time.time_ns()
     print("===>>开始生成矩阵matrix_A_xor_D")
@@ -187,7 +184,19 @@ if __name__ == '__main__':
     print("===>>匹配用时：{}ms,循环次数：{}".format(get_use_time(start4), count_debug))
     print("===>>recv总用时：{}ms".format(get_use_time(start1)))
     print('交集最后一个元素：', psi_recv.psi_msg_index[-1])
-    print('===>>接收方求交结束...')
     assert psi_size == (psi_recv.psi_msg_index[-1] + 1)
     # psi_recv.gen_matrix_A_xor_D()
+    print('===>>接收方求交结束...')
     pass
+
+
+if __name__ == '__main__':
+    receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
+    print('receiver_size, sender_size, psi_size, ip, port=',
+          receiver_size, sender_size, psi_size, ip, port)
+    print("===================")
+
+    for i in range(1):
+        recv_pro(receiver_size, sender_size, psi_size, ip, port)
+        print("{}===>>end".format(i))
+    # time.sleep(100)

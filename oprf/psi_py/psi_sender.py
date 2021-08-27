@@ -8,9 +8,9 @@ import getopt
 
 
 class Sender(object):
-    def __init__(self, common_seed: bytes, sender_size: int, matrix_width: int = 128):
+    def __init__(self, common_seed: bytes, sender_size: int, matrix_width: int = 128, omp_thread_num: int = 1):
         self.sender_size = sender_size
-        self.PsiSender = OprfPsiSender(common_seed, sender_size, matrix_width)
+        self.PsiSender = OprfPsiSender(common_seed, sender_size, matrix_width, omp_thread_num)
 
     def gen_public_param(self):
         return self.PsiSender.gen_public_param()
@@ -38,9 +38,13 @@ class Client(object):
     def __init__(self, host, port):
         self.buf_size = 100 * 1024 * 1024
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # 连接服务，指定主机和端口
-
-        self.s.connect((host, port))
+        while True:
+            try:
+                # 连接服务，指定主机和端口
+                self.s.connect((host, port))
+                break
+            except Exception:
+                continue
 
     def send_data(self, msg):
         head = len(msg)
@@ -134,11 +138,7 @@ def get_use_time(start: int) -> float:
     return (time.time() - start) * 1000
 
 
-if __name__ == "__main__":
-    receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
-    print('receiver_size, sender_size, psi_size, ip, port=',
-          receiver_size, sender_size, psi_size, ip, port)
-    print("===================")
+def send_pro(receiver_size, sender_size, psi_size, ip, port):
     client = Client(ip, port)
     sender_set = client.test_gen_data_set(sender_size, psi_size)
 
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     # common_seed:16字节的bytes，双方必须做到统一
     common_seed = b'1111111111111112'  # bytearray(b'1111111111111112')
     # 2. 创建接收方对象
-    psi_sender = Sender(common_seed, sender_size)
+    psi_sender = Sender(common_seed, sender_size, omp_thread_num=4)
     # 3. 本地生成公共参数public_param
     pub_param, pub_param_byte_size = psi_sender.gen_public_param()
     print("===>", len(pub_param), pub_param, pub_param_byte_size)
@@ -175,3 +175,14 @@ if __name__ == "__main__":
         client.send_data(hash2_output_val)
     print('===>>发送方结束...')
     pass
+
+
+if __name__ == "__main__":
+    receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
+    print('receiver_size, sender_size, psi_size, ip, port=',
+          receiver_size, sender_size, psi_size, ip, port)
+    print("===================")
+    for i in range(1):
+        send_pro(receiver_size, sender_size, psi_size, ip, port)
+        print("{}===>>end".format(i))
+    # time.sleep(100)
