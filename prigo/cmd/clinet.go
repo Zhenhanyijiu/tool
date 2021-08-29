@@ -16,8 +16,8 @@ import (
 )
 
 func main() {
-	url1 := "http://127.0.0.1:8800/algo/start"
-	url2 := "http://127.0.0.1:8801/algo/start"
+	url1 := "http://127.0.0.1:8800/v1/algo/start"
+	url2 := "http://127.0.0.1:8801/v1/algo/start"
 	num := flag.Int("num", 100, "cycle number")
 	prefix := flag.String("prefix", "", "prefix to deffer")
 	flag.Parse()

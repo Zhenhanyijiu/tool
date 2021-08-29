@@ -19,7 +19,7 @@ type GetSendKeyFunc func(flowId, curNodeId, targetNodeId, keyName string) string
 type GetRecvKeyFunc func(flowId, targetNodeId, curNodeId, keyName string) string
 
 func GetSendUrl(targetIp string) string {
-	return "http://" + targetIp + "/channel/send"
+	return "http://" + targetIp + "/v1/channel/send"
 }
 func GetSendKey(flowId, curNodeId, targetNodeId, keyName string) string {
 	return flowId + "_" + curNodeId + "_to_" + targetNodeId + "_" + keyName

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/asim/go-micro/v3/web"
 	"github.com/gin-gonic/gin"
 	"prigo/algo/base"
 	"prigo/algo/message"
@@ -62,10 +63,18 @@ func (s *Server) Start(c *gin.Context) {
 }
 
 func (s *Server) Route() {
-	g := gin.New()
-	gChannel := g.Group("/channel")
-	gChannel.POST("/send", s.SaveDataToCache)
-	gAlgo := g.Group("/algo")
-	gAlgo.POST("/start", s.Start)
-	g.Run(s.Sa)
+	router := gin.New()
+	v1Grp := router.Group("/v1")
+	v1Grp.POST("/channel/send", s.SaveDataToCache)
+	v1Grp.POST("/algo/start", s.Start)
+	message.Log.Info("use go-micro...\n")
+	webSer := web.NewService(
+		web.Address("psi_"+s.Sa),
+		web.Address(s.Sa),
+		web.Handler(router),
+	)
+	message.Log.Info("server start ...\n")
+	if err := webSer.Run(); err != nil {
+		panic(err)
+	}
 }
