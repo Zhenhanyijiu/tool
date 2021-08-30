@@ -46,7 +46,7 @@ namespace osuCrypto
             // H2
             dataSetOutput[i] = *(block *)(h1Output + sizeof(block));
         }
-        printf("===>>H1内部for循环用时:%ldms\n", get_use_time(start0));
+        printf(">>>计算H1内部for循环用时:%ld ms\n", get_use_time(start0));
         commonAes.ecbEncBlocks(aesInput, dataSetInputSize, aesOutput);
         //生成dataSetOutput数据。文章中H1(y)
         for (auto i = 0; i < dataSetInputSize; ++i)
@@ -58,23 +58,23 @@ namespace osuCrypto
         delete[] aesOutput;
         aesOutput = nullptr;
     }
-    //多线程
-    //多线程处理
+    //多线程处理，计算Hash1
     typedef struct HashOneInfo
     {
         int threadId;
         int h1LengthInBytes;
-        u64 num;
+        u64 processNum;
         block *aesInputStart;
         block *dataSetOutputStart;
         vector<u8> *dataSetInputStart;
     } HashOneInfo;
+    //自己创建线程，未使用这种方式
     void *process_hash1_thread(void *arg)
     {
         HashOneInfo *info = (HashOneInfo *)arg;
         RandomOracle H1(info->h1LengthInBytes); // 32bytes
         u8 h1Output[info->h1LengthInBytes];     // 32bytes
-        for (auto i = 0; i < info->num; ++i)
+        for (auto i = 0; i < info->processNum; ++i)
         {
             // 256个元素
             H1.Reset();
@@ -88,6 +88,7 @@ namespace osuCrypto
         }
         pthread_exit(NULL);
     }
+    //自己创建线程，未使用这种方式
     void transformInputByH1_thread(const AES &commonAes, const u64 h1LengthInBytes,
                                    const vector<vector<u8>> &dataSetInput, block *dataSetOutput)
     {
@@ -104,18 +105,19 @@ namespace osuCrypto
         pthread_attr_init(&attr);
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
         HashOneInfo infoArgs[numTh];
+        memset(infoArgs, 0, numTh * sizeof(HashOneInfo));
         u64 stepLength = dataSetInputSize / numTh;
         u64 remain = dataSetInputSize % numTh;
-        printf("===>>多线程stepLength:%ld\n", stepLength);
+        printf(">>>多线程stepLength:%ld\n", stepLength);
         for (int i = 0; i < numTh; i++)
         {
             if (i == numTh - 1)
             {
-                infoArgs[i].num = stepLength + remain;
+                infoArgs[i].processNum = stepLength + remain;
             }
             else
             {
-                infoArgs[i].num = stepLength;
+                infoArgs[i].processNum = stepLength;
             }
             infoArgs[i].threadId = i;
             infoArgs[i].h1LengthInBytes = 32;
@@ -125,10 +127,10 @@ namespace osuCrypto
             int fg = pthread_create(&threads[i], NULL, process_hash1_thread, (void *)(infoArgs + i));
             if (fg)
             {
-                printf("===>>create thread error\n");
+                printf(">>>create thread error\n");
                 exit(-1);
             }
-            printf("===>>iii:%d\n", i);
+            printf(">>>i in for cycle is:%d\n", i);
         }
         // 删除属性，并等待其他线程
         pthread_attr_destroy(&attr);
@@ -137,12 +139,12 @@ namespace osuCrypto
             int fg = pthread_join(threads[i], &status);
             if (fg)
             {
-                printf("===>>pthread_join thread error\n");
+                printf(">>>pthread_join thread error\n");
                 exit(-1);
             }
         }
         // pthread_exit(NULL);
-        printf("===>>H1内部for循环用时:%ldms\n", get_use_time(start0));
+        printf(">>>计算H1内部for循环用时:%ld ms\n", get_use_time(start0));
         commonAes.ecbEncBlocks(aesInput, dataSetInputSize, aesOutput);
         //生成dataSetOutput数据。文章中H1(y)
         for (auto i = 0; i < dataSetInputSize; ++i)
@@ -154,13 +156,13 @@ namespace osuCrypto
         delete[] aesOutput;
         aesOutput = nullptr;
     }
-    //用omp指令
+    //用omp并行指令，加速Hash1的计算，在使用
     void process_hash1_omp(HashOneInfo *info)
     {
-        // HashOneInfo *info = (HashOneInfo *)arg;
+        printf(">>>(process_hash1_omp)omp thread id:%d\n", info->threadId);
         RandomOracle H1(info->h1LengthInBytes); // 32bytes
         u8 h1Output[info->h1LengthInBytes];     // 32bytes
-        for (auto i = 0; i < info->num; ++i)
+        for (auto i = 0; i < info->processNum; ++i)
         {
             // 256个元素
             H1.Reset();
@@ -173,30 +175,30 @@ namespace osuCrypto
             info->dataSetOutputStart[i] = *(block *)(h1Output + sizeof(block));
         }
     }
+    //用omp并行指令，加速Hash1的计算
     void transformInputByH1(const AES &commonAes, const u64 h1LengthInBytes,
                             const vector<vector<u8>> &dataSetInput, block *dataSetOutput, int threadNum)
     {
         u64 dataSetInputSize = dataSetInput.size();
         block *aesInput = new block[dataSetInputSize];
         block *aesOutput = new block[dataSetInputSize];
-        // RandomOracle H1(h1LengthInBytes); // 32bytes
-        // u8 h1Output[h1LengthInBytes];     // 32bytes
         long start0 = start_time();
         int numTh = threadNum;
         HashOneInfo infoArgs[numTh];
+        memset(infoArgs, 0, sizeof(HashOneInfo) * numTh);
         u64 stepLength = dataSetInputSize / numTh;
         u64 remain = dataSetInputSize % numTh;
-        printf("===>>omp stepLength:%ld\n", stepLength);
-
+        printf(">>>omp 并行计算Hash1,stepLength:%ld,threadNum(%d)\n", stepLength, threadNum);
         for (int i = 0; i < numTh; i++)
         {
+            infoArgs[i].threadId = i;
             if (i == numTh - 1)
             {
-                infoArgs[i].num = stepLength + remain;
+                infoArgs[i].processNum = stepLength + remain;
             }
             else
             {
-                infoArgs[i].num = stepLength;
+                infoArgs[i].processNum = stepLength;
             }
             infoArgs[i].threadId = i;
             infoArgs[i].h1LengthInBytes = 32;
@@ -209,7 +211,7 @@ namespace osuCrypto
         {
             process_hash1_omp(infoArgs + i);
         }
-        printf("===>>H1内部for循环用时:%ldms\n", get_use_time(start0));
+        // printf(">>>omp 并行计算Hash1 用时:%ld ms\n", get_use_time(start0));
         commonAes.ecbEncBlocks(aesInput, dataSetInputSize, aesOutput);
         //生成dataSetOutput数据。文章中H1(y)
         for (auto i = 0; i < dataSetInputSize; ++i)
@@ -257,7 +259,7 @@ namespace osuCrypto
         // block localSeedBlock = toBlock((u8 *)localSeed);
         PRNG localRng(this->commonSeed);
         this->lowL = (u64)0;
-        printf("===>>hash2LengthInBytes:%ld,bucket2ForComputeH2Output:%ld\n", hash2LengthInBytes, bucket2ForComputeH2Output);
+        printf(">>>hash2LengthInBytes:%ld,bucket2ForComputeH2Output:%ld\n", hash2LengthInBytes, bucket2ForComputeH2Output);
         return this->iknpOteSender.init(localRng);
     }
     int PsiReceiver::genPK0FromNpot(u8_t *pubParamBuf, const u64_t pubParamBufByteSize,
@@ -266,7 +268,7 @@ namespace osuCrypto
         return this->iknpOteSender.genPK0FromNpot(pubParamBuf, pubParamBufByteSize,
                                                   pk0Buf, pk0BufSize);
     }
-    //并行计算 MatrixAxorD
+    //并行计算 MatrixAxorD,参数结构体
     typedef struct ComputeMatrixAxorDInfo
     {
         int threadId;
@@ -300,12 +302,13 @@ namespace osuCrypto
         const u8 *recvMatrixADBuffBegin;
         //16
         vector<u8> *transHashInputsPtr;
-        //17
-        u8 *sendMatrixADBuff;
+        //17,存储发送给对方的数据
+        u8 *sendMatrixADBuffPtr;
     } ComputeMatrixAxorDInfo;
-    //并行计算矩阵AxorD
+    //并行计算矩阵AxorD，处理函数
     void process_compute_Matrix_AxorD(ComputeMatrixAxorDInfo *infoArg)
     {
+        printf(">>>(process_compute_Matrix_AxorD)omp thread id:%d\n", infoArg->threadId);
         int cycTimes = 0;
         u64 bucket1 = infoArg->bucket1;
         u64 widthBucket1 = infoArg->widthBucket1;
@@ -330,7 +333,6 @@ namespace osuCrypto
             auto wRight = wLeft + widthBucket1 < infoArg->processNum ? wLeft + widthBucket1 : infoArg->processNum;
             auto w = wRight - wLeft;
             //////////// Compute random locations (transposed) ////////////////
-            // commonPrng.get((u8 *)&commonKey, sizeof(block));
             AES commonAesFkey;
             commonAesFkey.setKey(infoArg->aesComKeys[cycTimes]);
             for (auto low = 0; low < receiverSize; low += bucket1)
@@ -371,7 +373,6 @@ namespace osuCrypto
                 }
             }
             //////////////// Compute matrix A & sent matrix ///////////////////////
-            // u8 *sentMatrix[w];
             u64 offset1 = wLeft * heightInBytes;
             u64 offset2 = 0;
             for (auto i = 0; i < w; ++i)
@@ -380,11 +381,11 @@ namespace osuCrypto
                 prng.get(matrixA[i], heightInBytes);
                 prng.SetSeed(infoArg->encMsgOutputPtr[i + wLeft][1]);
                 // prng.get(sentMatrix[i], this->heightInBytes);
-                prng.get(infoArg->sendMatrixADBuff + offset1 + offset2, heightInBytes);
+                prng.get(infoArg->sendMatrixADBuffPtr + offset1 + offset2, heightInBytes);
                 for (auto j = 0; j < heightInBytes; ++j)
                 {
                     // sentMatrix[i][j] ^= matrixA[i][j] ^ matrixDelta[i][j];
-                    (infoArg->sendMatrixADBuff + offset1 + offset2)[j] ^= matrixA[i][j] ^ matrixDelta[i][j];
+                    (infoArg->sendMatrixADBuffPtr + offset1 + offset2)[j] ^= matrixA[i][j] ^ matrixDelta[i][j];
                 }
                 //发送sM^A^D
                 //发送数据U^A^D给对方，
@@ -421,7 +422,7 @@ namespace osuCrypto
                                          u8_t **sendMatrixADBuff, u64_t *sendMatixADBuffSize)
     {
         int ublocksize = uBuffInputSize / sizeof(block);
-        printf("===>>收到的TxorR矩阵的字节大小:%ld,转化成block大小为:%ld\n", uBuffInputSize, ublocksize);
+        printf(">>>收到的TxorR矩阵的字节大小:%ld,转化成block大小为:%ld\n", uBuffInputSize, ublocksize);
         vector<block> uBuffInputBlock(ublocksize);
         block *begin = (block *)uBuffInput;
         for (int i = 0; i < ublocksize; i++)
@@ -434,7 +435,6 @@ namespace osuCrypto
         {
             return fg;
         }
-        //psi begin
         // u32 locationInBytes = (this->logHeight + 7) / 8;
         u64 locationInBytes = (this->logHeight + 7) >> 3;
         u64 widthBucket1 = sizeof(block) / locationInBytes;
@@ -443,44 +443,28 @@ namespace osuCrypto
         PRNG commonPrng(this->commonSeed);
         block commonKey;
         AES commonAes;
-        u8 *matrixA[widthBucket1];
-        u8 *matrixDelta[widthBucket1];
-        for (auto i = 0; i < widthBucket1; ++i)
-        {
-            matrixA[i] = new u8[this->heightInBytes]; //要释放
-            matrixDelta[i] = new u8[this->heightInBytes];
-        }
-        // u64 receiverSize = receiverSet.size();
-        // u64 receiverSizeInBytes = (receiverSize + 7) / 8;
-        // u64 receiverSizeInBytes = (receiverSize + 7) >> 3;
         if (receiverSet.size() != this->receiverSize)
         {
             return -111;
         }
-        u8 *transLocations[widthBucket1];
-        for (auto i = 0; i < widthBucket1; ++i)
-        {
-            transLocations[i] = new u8[this->receiverSize * locationInBytes + sizeof(u32)];
-        }
-        block randomLocations[this->bucket1]; // 256block
         /////////// Transform input /////////////////////
         commonPrng.get((u8 *)&commonKey, sizeof(block));
         commonAes.setKey(commonKey);
-        block *recvSet = new block[receiverSize];
-        // void *timeCompute = newTimeCompute();
-        // startTime(timeCompute);
+        block *recvSet = new block[this->receiverSize];
         long start0 = start_time();
         transformInputByH1(commonAes, this->h1LengthInBytes, receiverSet, recvSet, this->threadNumOmp);
-        // long useTimeH1 = getEndTime(timeCompute);
-        printf("===>>计算H1用时:%ldms\n", get_use_time(start0));
+        printf(">>>omp 并行计算Hash1用时:%ld ms\n", get_use_time(start0));
         ////////// Transform input end //////////////////
         /*********for cycle start*********/
-        printf("===>>widthBucket1(16/loc):%d,locationInBytes:%d\n", widthBucket1, locationInBytes);
+        printf(">>>(AD)widthBucket1(16/loc):%d,locationInBytes:%d\n", widthBucket1, locationInBytes);
+        printf("\n========并行计算AxorD参数准备开始======\n");
         //并行计算矩阵AxorD
         int threadNum = this->threadNumOmp;
         int sumCount = 0;
         int isExit = 0;
         ComputeMatrixAxorDInfo infoArgs[threadNum];
+        //将全部内存初始为0
+        memset((char *)infoArgs, 0, sizeof(ComputeMatrixAxorDInfo) * threadNum);
         //为每一个线程生成参数数据,主要是处理的矩阵的列数
         for (;;)
         {
@@ -506,7 +490,7 @@ namespace osuCrypto
                 break;
             }
         }
-        printf("sumCount:=%d\n", sumCount);
+        printf(">>>debug sumCount:=%d\n", sumCount);
         //不要漏掉余数
         if ((this->matrixWidth - sumCount) != 0)
         {
@@ -515,12 +499,12 @@ namespace osuCrypto
         }
         for (int i = 0; i < threadNum; i++)
         {
-            printf("procesNum[%2d]=:%2d,", i, infoArgs[i].processNum);
+            printf(">>>procesNum[%2d]:=%2d,", i, infoArgs[i].processNum);
         }
         cout << endl;
         for (int i = 0; i < threadNum; i++)
         {
-            printf("aesKeyNum[%2d]=:%2d,", i, infoArgs[i].aesKeyNum);
+            printf(">>>aesKeyNum[%2d]:=%2d,", i, infoArgs[i].aesKeyNum);
         }
         //分配处理的矩阵的列数结束
         //最重要的一步，生成Fk函数的keys
@@ -531,8 +515,8 @@ namespace osuCrypto
             commonPrng.get((u8 *)&comKey, sizeof(block));
             commonKeys.push_back(comKey);
         }
-        printf("\n===>>commonKeys size:%ld\n", commonKeys.size());
-        //给参数赋值
+        printf("\n>>>commonKeys size:%ld\n", commonKeys.size());
+        //给参数赋值,重要
         for (int k = 0; k < threadNum; k++)
         {
             infoArgs[k].threadId = k;
@@ -569,9 +553,8 @@ namespace osuCrypto
             //16
             infoArgs[k].transHashInputsPtr = (vector<u8> *)(this->transHashInputs.data()) + infoArgs[k].wLeftBegin;
             //17
-            infoArgs[k].sendMatrixADBuff = this->sendMatrixADBuff.data() + infoArgs[k].wLeftBegin;
+            infoArgs[k].sendMatrixADBuffPtr = (u8 *)(this->sendMatrixADBuff.data()) + (infoArgs[k].wLeftBegin) * (this->heightInBytes);
         }
-        printf("\n");
         for (int i = 0; i < threadNum; i++)
         {
             printf("aesBegin[%2d]:%2ld,", i, infoArgs[i].aesComkeysBegin);
@@ -579,113 +562,25 @@ namespace osuCrypto
         printf("\n");
         for (int j = 0; j < threadNum; j++)
         {
-            printf("wlfBegin[%2ld]:%2ld,", infoArgs[j].wLeftBegin);
+            printf("wlfBegin[%2ld]:%2ld,", j, infoArgs[j].wLeftBegin);
         }
-        printf("\n========参数准备结束======\n");
-        printf("========开始并行处理恢复矩阵C,threadNum(%d)========\n", threadNum);
-
+        printf("\n========并行计算AxorD参数准备结束======\n");
+        printf("========开始并行计算矩阵AxorD,threadNum(%d)========\n", threadNum);
         //omp process
+        start0 = start_time();
 #pragma omp parallel for num_threads(threadNum)
-        for (int i = 0; i < threadNumOmp; i++)
+        for (int i = 0; i < threadNum; i++)
         {
             process_compute_Matrix_AxorD(infoArgs + i);
         }
-        for (auto wLeft = 0; wLeft < this->matrixWidth; wLeft += widthBucket1)
-        {
-            auto wRight = wLeft + widthBucket1 < this->matrixWidth ? wLeft + widthBucket1 : this->matrixWidth;
-            auto w = wRight - wLeft;
-            //////////// Compute random locations (transposed) ////////////////
-            commonPrng.get((u8 *)&commonKey, sizeof(block));
-            commonAes.setKey(commonKey);
-            for (auto low = 0; low < receiverSize; low += this->bucket1)
-            {
-                auto up = low + this->bucket1 < receiverSize ? low + this->bucket1 : receiverSize;
-                //每256个输入处理一次，randomLocations==256blocks,Fk函数，Fk(H1(y))
-                commonAes.ecbEncBlocks(recvSet + low, up - low, randomLocations);
-                //如果w比较宽，这里的计算会增加
-                for (auto i = 0; i < w; ++i)
-                {
-                    for (auto j = low; j < up; ++j)
-                    {
-                        // randomLocations,256个block
-                        memcpy(transLocations[i] + j * locationInBytes,
-                               (u8 *)(randomLocations + (j - low)) + i * locationInBytes,
-                               locationInBytes);
-                    }
-                }
-            }
-            //////////// Compute matrix Delta /////////////////////////////////
-            //对应论文中的P2(接收者)
-            for (auto i = 0; i < widthBucket1; ++i)
-            {
-                memset(matrixDelta[i], 255, this->heightInBytes);
-                // heightInBytes，置为全1矩阵
-            }
-            //本方拥有的数据y的个数
-            for (auto i = 0; i < w; ++i)
-            {
-                for (auto j = 0; j < receiverSize; ++j)
-                {
-                    auto location =
-                        (*(u32 *)(transLocations[i] + j * locationInBytes)) & shift;
-                    // shift全1
-                    // location >> 3(除以8)表示matrixDelta[i]的字节位置
-                    // location & 0b0111,取出低3位；(location & 7)==0,1,2,3,4,5,6,7
-                    matrixDelta[i][location >> 3] &= ~(1 << (location & 7));
-                }
-            }
-            //////////////// Compute matrix A & sent matrix ///////////////////////
-            // u8 *sentMatrix[w];
-            u64 offset1 = wLeft * this->heightInBytes;
-            u64 offset2 = 0;
-            for (auto i = 0; i < w; ++i)
-            {
-                PRNG prng(this->encMsgOutput[i + wLeft][0]);
-                prng.get(matrixA[i], this->heightInBytes);
-                prng.SetSeed(this->encMsgOutput[i + wLeft][1]);
-                // prng.get(sentMatrix[i], this->heightInBytes);
-                prng.get(this->sendMatrixADBuff.data() + offset1 + offset2, this->heightInBytes);
-                for (auto j = 0; j < this->heightInBytes; ++j)
-                {
-                    // sentMatrix[i][j] ^= matrixA[i][j] ^ matrixDelta[i][j];
-                    (this->sendMatrixADBuff.data() + offset1 + offset2)[j] ^= matrixA[i][j] ^ matrixDelta[i][j];
-                }
-                //发送sM^A^D
-                //发送数据U^A^D给对方，
-                // ch.asyncSend(sentMatrix[i], heightInBytes);
-                //偏移计算
-                offset2 += heightInBytes;
-            }
-            ///////////////// Compute hash inputs (transposed) /////////////////////
-            for (auto i = 0; i < w; ++i)
-            {
-                for (auto j = 0; j < receiverSize; ++j)
-                {
-                    auto location =
-                        (*(u32 *)(transLocations[i] + j * locationInBytes)) & shift;
-                    this->transHashInputs[i + wLeft][j >> 3] |=
-                        (u8)((bool)(matrixA[i][location >> 3] & (1 << (location & 7))))
-                        << (j & 7);
-                }
-            }
-        }
-
-        printf("===>>计算H1之后,生成矩阵A,D用时:%ldms\n", get_use_time(start0));
+        printf("========并行计算矩阵AxorD结束,threadNum(%d)========\n", threadNum);
+        printf(">>>计算Hash1之后,并行生成矩阵A,D用时:%ldms\n", get_use_time(start0));
         /*********for cycle end*********/
         //将uBuff输出并发送给对方
         *sendMatrixADBuff = this->sendMatrixADBuff.data();
         *sendMatixADBuffSize = this->heightInBytes * this->matrixWidth;
         /****************************/
         // 最后释放空间
-        for (auto i = 0; i < widthBucket1; ++i)
-        {
-            delete[] matrixA[i];
-            matrixA[i] = nullptr;
-            delete[] matrixDelta[i];
-            matrixDelta[i] = nullptr;
-            delete[] transLocations[i];
-            transLocations[i] = nullptr;
-        }
         delete[] recvSet;
         recvSet = nullptr;
         return 0;
@@ -852,7 +747,7 @@ namespace osuCrypto
     // }
 
     //将sendMatrixADBuff发送给对方之后，接下来生成AllHashMap
-    //并行处理
+    //并行处理，并行生成hashMap,参数结构体类型
     typedef struct HashMapParallelInfo
     {
         int threadId;
@@ -866,8 +761,10 @@ namespace osuCrypto
         vector<u8> *transHashInputsPtr;
         unordered_map<u64, std::vector<std::pair<block, u32_t>>> *hashMap;
     } HashMapParallelInfo;
+    //并行生成hashmap 处理函数
     void process_for_hash_map(HashMapParallelInfo *infoArg)
     {
+        printf(">>>(process_for_hash_map)omp thread id:%d\n", infoArg->threadId);
         RandomOracle H(infoArg->hash2LengthInBytes);
         u8 hashOutput[sizeof(block)];
         u8 *hashInputs[infoArg->bucket2ForComputeH2Output];
@@ -921,10 +818,12 @@ namespace osuCrypto
         u64 processLen = this->receiverSize / threadNum;
         u64 remain = this->receiverSize % threadNum;
         HashMapParallelInfo infoArgs[threadNum];
+        //内存初始化为0
+        memset(infoArgs, 0, threadNum * sizeof(HashMapParallelInfo));
         //给每个线程的参数赋值
         for (int i = 0; i < threadNum; i++)
         {
-            infoArgs[i].threadId = 0;
+            infoArgs[i].threadId = i;
             infoArgs[i].startIndex = i * processLen;
             if (i == threadNum - 1)
             {
@@ -943,7 +842,7 @@ namespace osuCrypto
             infoArgs[i].hashMap = (unordered_map<u64, std::vector<std::pair<block, u32_t>>> *)(this->HashMapVector.data() + i);
         }
         //给每个线程的参数赋值结束
-        printf("===>>并行计算hashmap，threadNum(%d)\n", threadNum);
+        printf(">>>并行计算hashmap 开始，threadNum(%d)\n", threadNum);
 #pragma omp parallel for num_threads(threadNum)
         for (int i = 0; i < threadNum; i++)
         {
@@ -1110,8 +1009,7 @@ namespace osuCrypto
             memset(this->transHashInputs[i].data(), 0, this->senderSizeInBytes);
         }
         this->lowL = (u64)0;
-        // this->upR = (u64)0;
-        printf("===>>this->lowL:%ld\n", this->lowL);
+        // printf("===>>this->lowL:%ld\n", this->lowL);
         PRNG comPrng(commonSeed);
         this->commonPrng = new PRNG(commonSeed);
         this->sendSet = new block[this->senderSize];
@@ -1159,7 +1057,7 @@ namespace osuCrypto
         /////////// Transform input end /////////////////
         return 0;
     }
-    //并行恢复 recoverMatrixC
+    //并行恢复 recoverMatrixC，参数结构体类型
     typedef struct RecoverMatrixCInfo
     {
         int threadId;
@@ -1200,6 +1098,7 @@ namespace osuCrypto
 
     void process_recover_matrix_C(RecoverMatrixCInfo *infoArg)
     {
+        printf(">>>(process_recover_matrix_C)omp thread id:%d\n", infoArg->threadId);
         int cycTimes = 0;
         u64 widthBucket1 = infoArg->widthBucket1;
         u64 bucket1 = infoArg->bucket1;
@@ -1220,10 +1119,8 @@ namespace osuCrypto
             auto wRight = wLeft + widthBucket1 < infoArg->processNum ? wLeft + widthBucket1 : infoArg->processNum;
             auto w = wRight - wLeft;
             //////////// Compute random locations (transposed) ////////////////
-            // this->commonPrng->get((u8 *)&commonKey, sizeof(block));
             AES commonAesFkey;
             commonAesFkey.setKey(infoArg->aesComKeys[cycTimes]);
-            // infoArg->currThreadAesFkey[cycTimes].setKey(commonKey);
             for (auto low = 0; low < senderSize; low += bucket1)
             {
                 auto up = low + bucket1 < senderSize ? low + bucket1 : senderSize;
@@ -1238,12 +1135,10 @@ namespace osuCrypto
                     }
                 }
             }
-            // printf("===>>update aes一次transLocations用时:%ldms\n", get_use_time(start22));
             //////////////// Extend OTs and compute matrix C ///////////////////
             // u8 *recvMatrix;
             u64 offset1 = wLeft * heightInBytes;
             u64 offset2 = 0;
-            // long startOts = start_time();
             for (auto i = 0; i < w; ++i)
             {
                 PRNG prng(infoArg->recoverMsgWidthOutputPtr[i + wLeft]);
@@ -1257,13 +1152,9 @@ namespace osuCrypto
                 }
                 offset2 += heightInBytes;
             }
-            // printf("===>>>计算compute matrix C用时：%ldms\n", get_use_time(startOts));
-            // cout << "***********************22......" << endl;
             ///////////////// Compute hash inputs (transposed) /////////////////////
-            // long startInput = start_time();
             for (auto i = 0; i < w; ++i)
             {
-                // cout << "***********************33......" << endl;
                 for (auto j = 0; j < senderSize; ++j)
                 {
                     auto location =
@@ -1273,14 +1164,9 @@ namespace osuCrypto
                         << (j & 7);
                 }
             }
-            // printf("===>>>计算一次hashInput用时：%ldms\n", get_use_time(startInput));
         }
         /****cycle end ****/
         //**************释放内存*************//
-        // cout << "***********************before cycle end" << endl;
-        // printf("===>>cycle 用时：%ldms\n", get_use_time(start1));
-        // printf("===>>cycNum:%d\n", cycNum);
-        // long start33 = start_time();
         for (auto i = 0; i < widthBucket1; ++i)
         {
             delete[] transLocations[i];
@@ -1295,26 +1181,22 @@ namespace osuCrypto
         auto locationInBytes = (this->logHeight + 7) / 8;    // logHeight==1
         auto widthBucket1 = sizeof(block) / locationInBytes; // 16/1
         u64 shift = (1 << this->logHeight) - 1;              //全1
-        printf("===>>widthBucket1:%ld(16/loc),locationInBytes:%ld\n", widthBucket1, locationInBytes);
+        printf(">>>recover matrix C,widthBucket1:%ld(16/loc),locationInBytes:%ld\n", widthBucket1, locationInBytes);
         ////////////// Initialization //////////////////////
-        // PRNG commonPrng(this->commonSeed);
-        // bucket1 = bucket2 = 1 << 8;  // 256
         if (recvMatixADBuffSize != this->matrixWidth * this->heightInBytes)
         {
             return -111;
         }
         // u8 *transHashInputs[this->matrixWidth]; // width==60，矩阵宽度
         cout << "***********************before cycle" << endl;
-        // block commonKey;
-        // AES commonAesFkey;
         /****cycle start***/
         long start1 = start_time();
-        long start22;
-        // int cycNum = 0; //128/5=25...3
         int threadNum = this->threadNumOmp;
         u64 sumCount = 0;
         int isExit = 0;
+        printf("========参数准备开始======\n");
         RecoverMatrixCInfo infoArgs[threadNum];
+        //内存初始化为0
         memset((char *)infoArgs, 0, threadNum * sizeof(RecoverMatrixCInfo));
         //对每个线程进行分配处理的矩阵的列数
         for (;;)
@@ -1341,7 +1223,7 @@ namespace osuCrypto
                 break;
             }
         }
-        printf("sumCount:=%d\n", sumCount);
+        printf(">>>omp 处理,sumCount:=%d\n", sumCount);
         //不要漏掉余数
         if ((this->matrixWidth - sumCount) != 0)
         {
@@ -1366,19 +1248,14 @@ namespace osuCrypto
             this->commonPrng->get((u8 *)&comKey, sizeof(block));
             commonKeys.push_back(comKey);
         }
-        printf("\n===>>commonKeys size:%ld\n", commonKeys.size());
+        printf("\n>>>commonKeys size:%ld\n", commonKeys.size());
         //最重要的一步，取出 choicesWidthInput
         u64 choiceSize = this->choicesWidthInput.size();
-        // printf("===>choiceSizze:%ld\n", choiceSize);
-        // cout << "===>choicesWidthInput:" << this->choicesWidthInput << endl;
         vector<int> choiceVector;
-        // printf("===>choiceVector:");
         for (int i = 0; i < choiceSize; i++)
         {
             choiceVector.push_back(this->choicesWidthInput[i]);
-            // printf("%d,", choiceVector[i]);
         }
-
         //给参数赋值
         for (int k = 0; k < threadNum; k++)
         {
@@ -1420,7 +1297,7 @@ namespace osuCrypto
             //16
             infoArgs[k].transHashInputsPtr = (vector<u8> *)(this->transHashInputs.data()) + infoArgs[k].wLeftBegin;
         }
-        printf("\n");
+
         for (int i = 0; i < threadNum; i++)
         {
             printf("aesBegin[%2d]:%2ld,", i, infoArgs[i].aesComkeysBegin);
@@ -1428,22 +1305,22 @@ namespace osuCrypto
         printf("\n");
         for (int j = 0; j < threadNum; j++)
         {
-            printf("wlfBegin[%2ld]:%2ld,", infoArgs[j].wLeftBegin);
+            printf("wlfBegin[%2ld]:%2ld,", j, infoArgs[j].wLeftBegin);
         }
         printf("\n========参数准备结束======\n");
-        // sleep(1000);
-        printf("========开始并行处理恢复矩阵C,threadNum(%d)========\n", threadNum);
+        printf("========并行处理恢复矩阵C开始,threadNum(%d)========\n", threadNum);
 
 #pragma omp parallel for num_threads(threadNum)
         for (int i = 0; i < threadNum; i++)
         {
             process_recover_matrix_C(infoArgs + i);
         }
+        printf("========并行处理恢复矩阵C结束,threadNum(%d)========\n", threadNum);
         /****cycle end ****/
         //**************释放内存*************//
         cout << "***********************before cycle end" << endl;
-        printf("===>>cycle 用时：%ldms\n", get_use_time(start1));
-        printf(">>>>>>>>>> sendSet,end\n");
+        printf(">>>cycle 用时：%ldms\n", get_use_time(start1));
+        printf(">>> this->sendSet,end\n");
         return 0;
     }
 

@@ -119,45 +119,6 @@ void generateDataSet(const int ptype, const oc::u64 dataSize,
     }
     printf("===>>id length:%ld\n", dataSet[0].size());
 }
-// //debug function
-// void generateDataSetDebug(const int ptype, const u64_t dataSize, const u64_t psiSize,
-//                           u64_t seed, u64_t ids, vector<vector<u8_t>> *dataSet)
-// {
-//     oc::PRNG prng(toBlock(0x77887788 + seed));
-//     //sender
-//     // oc::u64 psiSize = Psi_Size;
-//     dataSet->resize(dataSize);
-//     assert(dataSize >= psiSize);
-//     if (ptype == 0)
-//     {
-//         u64 i = 0;
-//         for (; i < psiSize; i++)
-//         {
-//             (*dataSet)[i].resize(ids);
-//             prng.get((u8 *)((*dataSet)[i].data()), (u64)ids);
-//         }
-//         prng.SetSeed(toBlock(0x998877 + seed));
-//         for (; i < dataSize; i++)
-//         {
-//             (*dataSet)[i].resize(ids);
-//             // dataSet[i] = prng.get<oc::block>();
-//             prng.get((u8 *)((*dataSet)[i].data()), ids);
-//         }
-//     }
-//     printf("=========>>>>>>>>>>ids:%ld\n", ids);
-//     //receiver
-//     if (ptype == 1)
-//     {
-//         for (u64 i = 0; i < dataSize; i++)
-//         {
-//             (*dataSet)[i].resize(ids);
-//             // dataSet[i] = prng.get<oc::block>();
-//             prng.get((u8 *)((*dataSet)[i].data()), ids);
-//             // printf("=========>>>>22>>>>>>ids:%ld,size:%ld\n", ids, (*dataSet).size());
-//         }
-//     }
-//     printf("===>>id length:%ld\n", (*dataSet)[0].size());
-// }
 
 //write file
 void writeFileAllByCPP(const char *fileName, const char *buf, long bufSize)
@@ -253,8 +214,6 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64
     //生成recvSet
     long start0 = start_time();
     vector<vector<oc::u8_t>> recvSet;
-    // recvSet.resize(receiverSize);
-    // generateDataSet(1, receiverSize, seed, recvSet);
     if (inFile == "")
     {
         generateDataSet(1, receiverSize, seed, ids, recvSet);
@@ -264,11 +223,8 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64
     {
         generateDataFromFile(inFile.c_str(), recvSet, ids);
     }
-    // long int useTimeGenData = getEndTime(timeCompute);
-    printf("recv:生成接收者数据集:%ldms\n", get_use_time(start0));
+    printf("===>>recv:生成接收者数据集:%ldms\n", get_use_time(start0));
     //生成recvSet end
-    //printOTMsgSingle(recvSet);
-
     oc::PsiReceiver psiRecv;
     //初始化一个socket连接
     void *server = initChannel(SERVER, address.c_str(), port);
@@ -294,19 +250,18 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64
     oc::u64 matrixADBuffSize = 0;
     n = recv_data(server, &uBuffInput);
     assert(n > 0);
-    printf("===>>避免等待，开始计算hash1...\n");
     long start2 = start_time();
     fg = psiRecv.getSendMatrixADBuff((oc::u8 *)uBuffInput, n, recvSet,
                                      (oc::u8 **)&matrixADBuff, &matrixADBuffSize);
     assert(fg == 0);
     n = send_data(server, matrixADBuff, matrixADBuffSize);
-    printf("recv:生成MatrixAD所需时间:%ldms\n", get_use_time(start2));
-    printf("recv:OT所需时间:%ldms\n", get_use_time(start1));
+    printf("===>>recv:生成MatrixAD所需时间:%ld ms\n", get_use_time(start2));
+    printf("===>>recv:OT所需时间:%ld ms\n", get_use_time(start1));
     //本方生成hashMap
     long start3 = start_time();
     fg = psiRecv.genenateAllHashesMap();
     assert(fg == 0);
-    printf("recv:生成hashMap表所需时间:%ldms\n", get_use_time(start3));
+    printf("===>>recv:生成hashMap表所需时间:%ld ms\n", get_use_time(start3));
     //循环接收对方发来的hashOutput
     long start4 = start_time();
     char *hashOutput = nullptr;
@@ -326,7 +281,7 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64
         n = recv_data(server, &hashOutput);
         if (n <= 0)
         {
-            printf("===>>count:%d\n", count);
+            printf("===>>(error)count:%d\n", count);
         }
         assert(n > 0);
         if (count < countTmp)
@@ -342,27 +297,20 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64
         }
         count++;
     }
-    // long useTimeFind = getEndTime(timeCompute);
-    printf("recv: 匹配find用时：%ldms,totalCyc:%d,count:%d\n", get_use_time(start4), totalCyc, count);
-    printf("recv:总用时：%ldms\n", get_use_time(start1));
-    // for (int i = 0; i < psiMsgIndexs.size(); i++)
-    // {
-    //     cout << "i:" << i << "," << recvSet[i] << endl;
-    // }
-    printf("psi count:%ld,最后索引:%d\n", psiMsgIndexs.size(), psiMsgIndexs[psiMsgIndexs.size() - 1]);
+    printf("===>>count:%d\n", count);
+    printf("===>>recv: 匹配find用时：%ldms,totalCyc:%d,count:%d\n", get_use_time(start4), totalCyc, count);
+    printf("===>>recv:总用时：%ldms\n", get_use_time(start1));
+    printf("===>>psi count:%ld,最后索引:%d\n", psiMsgIndexs.size(), psiMsgIndexs[psiMsgIndexs.size() - 1]);
     assert(psiMsgIndexs.size() == Psi_Size);
     long start5 = start_time();
     if (outFile != "")
     {
         savePsiToFile(outFile.c_str(), psiMsgIndexs, recvSet);
-        // long int useTime1 = getEndTime(timeCompute);
         printf("psi数据保存到文件：%ldms\n", get_use_time(start5));
     }
-
     // //释放mem
     releaseChannel(server);
-    int nn = 0;
-    printf("===>>main end.sizeof(int)=%ld\n", sizeof(nn));
+    printf("===>>main end...\n");
 }
 void send_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64_t senderSize,
                   oc::u64_t ids, string address, int port, oc::u8_t *commonSeed, oc::u64_t matrixWidth,
@@ -383,7 +331,7 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64
         generateDataFromFile(inFile.c_str(), sendSet, ids);
     }
     // long int useTimeGenData = getEndTime(timeCompute);
-    printf("send:生成发送者数据集:%ldms\n", get_use_time(start0));
+    printf("===>>sender:生成发送者数据集:%ldms\n", get_use_time(start0));
     //生成sendSet end
     oc::PsiSender psiSender;
     //初始化一个socket连接
@@ -408,12 +356,14 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64
     oc::u8 *uBuffOutput = nullptr;
     oc::u64 uBuffOutputSize = 0;
     //[3]输入pk0s，生成uBuffOutput,并发送给对方
+    long start_TxorR = start_time();
     fg = psiSender.genMatrixTxorRBuff((oc::u8 *)pk0sBuf, n, &uBuffOutput, &uBuffOutputSize);
+    printf("===>>发送方生成TxorR矩阵用时:%ld ms\n", get_use_time(start_TxorR));
     assert(fg == 0);
     n = send_data(client, (char *)uBuffOutput, uBuffOutputSize);
     assert((oc::u64)n == uBuffOutputSize);
     //计算H1 start（避免等待）
-    printf("===>>避免等待，开始计算hash1...\n");
+    printf("===>>发送方避免等待，开始计算hash1...\n");
     fg = psiSender.computeAllHashOutputByH1(sendSet);
     assert(fg == 0);
     //计算H1 end
@@ -422,13 +372,13 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64
     long start_recv_AD = start_time();
     n = recv_data(client, &matrixAxorD);
     assert(n > 0);
-    printf("send:收到matrix AxorD用时:%d ms\n", get_use_time(start_recv_AD));
+    printf("===>>接收收到matrixAxorD用时:%ld ms\n", get_use_time(start_recv_AD));
     //恢复矩阵C
     long start3 = start_time();
     fg = psiSender.recoverMatrixC((oc::u8 *)matrixAxorD, n);
     assert(fg == 0);
-    printf("send:recoverMatrixC所需时间:%ldms\n", get_use_time(start3));
-    printf("send:OT所需时间:%ldms\n", get_use_time(start2));
+    printf("===>>recoverMatrixC所需时间:%ldms\n", get_use_time(start3));
+    printf("===>>OT所需时间:%ldms\n", get_use_time(start2));
     //循环发送hash输出给对方
     vector<oc::u8> hashOutputOnceBuff(hash2LengthInBytes * bucket2ForComputeH2Output);
     oc::u64 hashOutputOnceBuffSize = 0;
@@ -462,11 +412,11 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize, oc::u64
     }
 
     printf("===>>count:%d\n", count);
-    printf("send: 匹配find用时：%ldms,totalCyc:%d\n", get_use_time(start4), totalCyc);
-    printf("send: 总用时:%ldms\n", get_use_time(start2));
+    printf("sender: 匹配find用时：%ldms,totalCyc:%d\n", get_use_time(start4), totalCyc);
+    printf("sender: 总用时:%ldms\n", get_use_time(start2));
     // //释放mem, sender
     releaseChannel(client);
-    printf("send:----------->>>>>>main over \n");
+    printf("sender:----------->>>>>>main over \n");
 }
 int main(int argc, char **argv)
 {
@@ -475,36 +425,36 @@ int main(int argc, char **argv)
     cmd.parse(argc, argv);
     cmd.setDefault("w", 60);
     oc::u64 matrixWidth = cmd.get<oc::u64>("w");
-    printf("w:%ld\n", matrixWidth);
+    printf("===>>矩阵宽度w:%ld\n", matrixWidth);
     cmd.setDefault("h", 10);
     oc::u64 logHeight = cmd.get<oc::u64>("h");
-    printf("logH:%ld\n", logHeight);
+    printf("===>>矩阵高度取对数logH:%ld\n", logHeight);
     cmd.setDefault("ss", 5000000);
     oc::u64 senderSize = cmd.get<oc::u64>("ss");
-    printf("ss:%ld\n", senderSize);
+    printf("===>>接收方集合大小ss:%ld\n", senderSize);
     cmd.setDefault("rs", 5000000);
     oc::u64 receiverSize = cmd.get<oc::u64>("rs");
-    printf("rs:%ld\n", receiverSize);
+    printf("===>>发送方集合大小rs:%ld\n", receiverSize);
     //数据id的长度
     cmd.setDefault("ids", 18);
     oc::u64 ids = cmd.get<oc::u64>("ids");
-    printf("ids:%ld,length of id\n", ids);
+    printf("===>>每个id的字节长度ids:%ld,length of id\n", ids);
     //命令行传种子
     cmd.setDefault("sd", 0);
     seed = cmd.get<oc::u64>("sd");
-    printf("sd:%ld\n", seed);
+    printf("===>>公共种子用于测试sd:%ld\n", seed);
     //交集个数
     cmd.setDefault("ps", 2000000);
     Psi_Size = cmd.get<oc::u64>("ps");
-    printf("交集个数，ps:%ld\n", Psi_Size);
+    printf("===>>双方交集个数用于测试，ps:%ld\n", Psi_Size);
     //数据文件路径
     cmd.setDefault("in", "");
     string inFile = cmd.get<string>("in");
-    printf("in:%s,input file\n", inFile.c_str());
+    printf("===>>输入文件路径in:%s,input file\n", inFile.c_str());
     //保存数据文件路径
     cmd.setDefault("out", "");
     string outFile = cmd.get<string>("out");
-    printf("out:%s,output file\n", outFile.c_str());
+    printf("===>>输出文件路径out:%s,output file\n", outFile.c_str());
     // int hash2LengthInBytes = atoi(argv[6]);
     int hash2LengthInBytes = 10;
     // int bucket2ForComputeH2Output = atoi(argv[7]);
@@ -514,15 +464,15 @@ int main(int argc, char **argv)
     //ip地址
     cmd.setDefault("ip", "127.0.0.1");
     string address = cmd.get<string>("ip");
-    printf("ip:%s\n", address.c_str());
+    printf("===>>ip地址ip:%s\n", address.c_str());
     //port端口
     cmd.setDefault("port", 7878);
     int port = cmd.get<oc::u64>("port");
-    printf("port:%d\n", port);
+    printf("===>>端口port:%d\n", port);
     //omp num
     cmd.setDefault("omp", 1);
     int omp_num = cmd.get<oc::u64>("omp");
-    printf("omp_num:%d\n", omp_num);
+    printf("===>>线程数omp_num:%d\n", omp_num);
     if (!cmd.isSet("r"))
     {
         std::cout << "=================================\n"
@@ -550,7 +500,7 @@ int main(int argc, char **argv)
         return 0;
     }
     int ptype = cmd.get<oc::u64>("r");
-    printf("r:%d\n", ptype);
+    printf("===>>类型（发送方或者接收方）r:%d\n", ptype);
 
     // oc::block commonSeed = oc::toBlock(0x333333 + seed);
     oc::u64 comSeed = 0x333333 + seed;
@@ -575,7 +525,7 @@ int main(int argc, char **argv)
 
             // return 0;
         }
-        printf("===>>(%d)用时：%ld ms\n", i, get_use_time(start0));
+        printf("===>>(%d)测试用时：%ld ms\n", i, get_use_time(start0));
     }
 
     // sleep(1000);

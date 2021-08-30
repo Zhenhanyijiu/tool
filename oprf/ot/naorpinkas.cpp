@@ -165,7 +165,7 @@ namespace osuCrypto
     {
         u64 rNum = choices.size();
         cout << "rNum:" << rNum << endl;
-        cout << "otMsgPairSize:" << otMsgPairSize << endl;
+        cout << "otMsgPairSize:" << this->otMsgPairSize << endl;
         if (pubParamBuf == NULL || pk0Buf == NULL || rNum != otMsgPairSize)
         {
             print_error(-4);
@@ -222,7 +222,7 @@ namespace osuCrypto
         Point PK0(curve);
         Point &gka = PK0;
         u64 fieldElementSize = PK0.sizeBytes();
-        cout << "===>>fieldElementSize:" << fieldElementSize << endl;
+        cout << "fieldElementSize:" << fieldElementSize << endl;
         RandomOracle sha(sizeof(block)); //otPerMsgBitSize
         vector<u8> buff(fieldElementSize);
         Brick ga(pC[0]); // bc==A==g^a
