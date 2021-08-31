@@ -1,6 +1,6 @@
 #ifndef _PSI_C_H_
 #define _PSI_C_H_
-#ifdef __cpulsplus
+#ifdef __cplusplus
 extern "C"
 {
 #endif
@@ -20,7 +20,7 @@ extern "C"
     //recevicer
     void *new_psi_receiver(char *common_seed, ui64 receiver_size, ui64 sender_size,
                            int omp_num);
-#ifdef __cpulsplus
+#ifdef __cplusplus
 }
 #endif
 #endif
