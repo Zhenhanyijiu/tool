@@ -909,22 +909,24 @@ namespace osuCrypto
         {
             return -122;
         }
-        for (auto idx = 0; idx < up - this->lowL; ++idx)
+        //
+        u64 offset = 0;
+        for (auto idx = 0; idx < up - this->lowL; ++idx, offset += this->hash2LengthInBytes)
         {
-            u64 mapIdx = *(u64 *)(recvBuff + idx * this->hash2LengthInBytes);
+            u64 mapIdx = *(u64 *)(recvBuff + offset);
+            // #pragma omp parallel for num_threads(this->threadNumOmp)
             for (int i = 0; i < this->HashMapVector.size(); i++)
             {
                 auto found = this->HashMapVector[i].find(mapIdx);
                 if (found == this->HashMapVector[i].end())
                     continue;
                 //可能找到好几个
-                for (auto i = 0; i < found->second.size(); ++i)
+                for (auto j = 0; j < found->second.size(); ++j)
                 {
-                    if (memcmp(&(found->second[i].first),
-                               recvBuff + idx * this->hash2LengthInBytes,
-                               this->hash2LengthInBytes) == 0)
+                    if (memcmp(&(found->second[j].first),
+                               recvBuff + offset, this->hash2LengthInBytes) == 0)
                     {
-                        psiMsgIndex->push_back(found->second[i].second);
+                        psiMsgIndex->push_back(found->second[j].second);
                         break;
                     }
                 }
@@ -1465,12 +1467,13 @@ namespace osuCrypto
                     << (i & 7);
             }
         }
-        for (auto j = this->lowL; j < upR; ++j)
+        u64 offset = 0;
+        for (auto j = this->lowL; j < upR; ++j, offset += this->hash2LengthInBytes)
         {
             H.Reset();
             H.Update(this->hashInputs[j - this->lowL].data(), this->matrixWidthInBytes);
             H.Final(hashOutput);
-            memcpy(hashOutputBuff + (j - this->lowL) * this->hash2LengthInBytes,
+            memcpy(hashOutputBuff + offset,
                    hashOutput, this->hash2LengthInBytes);
         }
         *sendBuffSize = (upR - this->lowL) * this->hash2LengthInBytes;
