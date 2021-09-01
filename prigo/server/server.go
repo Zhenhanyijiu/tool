@@ -69,7 +69,7 @@ func (s *Server) Route() {
 	v1Grp.POST("/algo/start", s.Start)
 	message.Log.Info("use go-micro...\n")
 	webSer := web.NewService(
-		web.Address("psi_"+s.Sa),
+		web.Name("psi_"+s.Sa),
 		web.Address(s.Sa),
 		web.Handler(router),
 	)

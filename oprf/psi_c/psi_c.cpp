@@ -106,12 +106,6 @@ typedef struct psi_receiver
     ui64 sender_size;
     vector<oc::u32_t> psi_array;
 } psi_receiver;
-// typedef struct int_buffer
-// {
-//     unsigned int *psi_array;
-//     ui64 psi_array_size;
-//     ui64 psi_array_max_len;
-// } int_buffer;
 
 void *new_psi_receiver(char *common_seed, ui64 receiver_size, ui64 sender_size, int omp_num)
 {
@@ -120,7 +114,7 @@ void *new_psi_receiver(char *common_seed, ui64 receiver_size, ui64 sender_size, 
     {
         return NULL;
     }
-    // unsigned int *psi_array=(unsigned int)malloc()
+
     psi_r->sender_size = sender_size;
     psi_r->receiver_size = receiver_size;
     int ret = psi_r->receiver.init((oc::u8_t *)common_seed, receiver_size, sender_size,

@@ -30,6 +30,8 @@ ${CRYPTO_INCLUDE}/cryptoTools/Common/*.cpp \
 ${BLAKE2_DIR}/*.c \
 ${CRYPTO_INCLUDE}/cryptoTools/Crypto/*.cpp \
 ../ot/*.cpp \
-./include/psi_c.cpp \
--o libpsi.so -fopenmp
+./psi_c.cpp \
+-o ./lib/libpsi.so -fopenmp
+
+cp -r include lib ./psicgo/psicgo
 # -lpthread \
