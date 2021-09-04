@@ -1,19 +1,22 @@
-#include <iostream>
+#include <assert.h>
 #include <omp.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <string.h>
-#include <assert.h>
+#include <unistd.h>
+
+#include <future>
+#include <iostream>
+#include <unordered_map>
 #include <vector>
 using namespace std;
-//g++ test_omp.cpp -fopenmp
+// g++ test_omp.cpp -fopenmp
 // void test()
 // {
 //     for (int i = 0; i < 80000; i++)
 //     {
 //     }
 // }
-
+#if 0
 int main()
 {
     // float startTime = omp_get_wtime();
@@ -181,3 +184,45 @@ int main()
     printf("===>>main end\n");
     return 0;
 }
+#endif
+#if 1
+double f(double a, double b) {
+  double c = a + b;
+  printf(">>>>>>>\n");
+  sleep(2);
+  return c;
+}
+int main() {
+  unordered_map<unsigned long long int, vector<unsigned int>> table_map;
+  printf("table_map:%ld,%ld\n", sizeof(table_map),
+         sizeof(unordered_map<unsigned long long int, vector<unsigned int>>));
+  unordered_map<int, int> table_map1;
+  table_map1[8] = 77;
+  table_map1[7] = 77;
+  printf("table_map1:%ld,%ld\n", sizeof(table_map1),
+         sizeof(unordered_map<int, int>));
+
+  ////////////
+  //   double a = 1.0, b = 2.1;
+  //   future<double> fu = async(f, a, b);
+  //   shared_future<double> fu = async(f, a, b);
+  //   shared_future<double> c1 = async(f, a, fu.get());
+  //   shared_future<double> c2 = async(f, a, fu.get());
+  // cout << "..." << endl;
+  //   printf("=======......1\n");
+  //   cout << "result:" << c1.get() << endl;
+  //   printf("=======......2\n");
+  //   cout << "result:" << c2.get() << endl;
+  printf("=======......3\n");
+#pragma omp parallel  // for num_threads(2)
+  printf("hhhh\n");
+#pragma omp parallel for num_threads(2)
+  for (int i = 0; i < 2; i++) {
+    double a = i, b = 2.7;
+    shared_future<double> fu = async(f, a, b);
+    cout << "result:" << fu.get() << endl;
+  }
+
+  //   cout << "result:" << fu.get() << endl;
+}
+#endif
