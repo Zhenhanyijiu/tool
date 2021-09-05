@@ -57,7 +57,7 @@ int gen_matrix_T_xor_R(void *psi_s, char *pk0s, const ui64 pk0s_size,
 }
 
 int compute_all_hash_output_byH1(void *psi_s, const char **sender_set,
-                                 const ui64 sender_size)
+                                 const ui64 sender_size, const int id_size)
 {
     psi_sender *s = (psi_sender *)psi_s;
     if (s->sender_size != sender_size)
@@ -66,11 +66,11 @@ int compute_all_hash_output_byH1(void *psi_s, const char **sender_set,
     }
 
     vector<vector<oc::u8_t>> senderSet(sender_size);
-    for (oc::u8_t i = 0; i < sender_size; i++)
+    for (oc::u64_t i = 0; i < sender_size; i++)
     {
-        int len = strlen(sender_set[i]);
-        senderSet[i].resize(len);
-        memcpy(senderSet[i].data(), sender_set[i], len);
+        // int len = strlen(sender_set[i]);
+        senderSet[i].resize(id_size);
+        memcpy(senderSet[i].data(), sender_set[i], id_size);
     }
     return s->sender->computeAllHashOutputByH1(senderSet);
     // return 0;
@@ -150,7 +150,7 @@ int gen_pk0s_from_npot(void *psi_r, char *pubParamBuf, const ui64 pubParamBufByt
 //                                 const vector<vector<u8_t>> receiverSet,
 //                                 u8_t **sendMatrixADBuff, u64_t *sendMatixADBuffSize);
 int get_matrix_AxorD(void *psi_r, const char *uBuffInputTxorR, const ui64 uBuffInputSize,
-                     const char **receiver_set, const ui64 receiver_set_size,
+                     const char **receiver_set, const ui64 receiver_set_size, const int id_size,
                      char **sendMatrixADBuff, ui64 *sendMatixADBuffSize)
 {
     psi_receiver *r = (psi_receiver *)psi_r;
@@ -159,6 +159,11 @@ int get_matrix_AxorD(void *psi_r, const char *uBuffInputTxorR, const ui64 uBuffI
         return -1;
     }
     vector<vector<oc::u8_t>> receiverSet(receiver_set_size);
+    for (oc::u64_t i = 0; i < receiver_set_size; i++)
+    {
+        receiverSet[i].resize(id_size);
+        memcpy(receiverSet[i].data(), receiver_set[i], id_size);
+    }
     return r->receiver.getSendMatrixADBuff((oc::u8_t *)uBuffInputTxorR, uBuffInputSize, receiverSet,
                                            (oc::u8_t **)sendMatrixADBuff,
                                            (oc::u64_t *)sendMatixADBuffSize);

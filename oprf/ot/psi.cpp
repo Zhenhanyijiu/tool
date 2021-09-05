@@ -538,7 +538,8 @@ namespace osuCrypto
     {
       block comKey;
       commonPrng.get((u8 *)&comKey, sizeof(block));
-      commonKeys.push_back(comKey);
+      // commonKeys.push_back(comKey);
+      commonKeys.emplace_back(comKey);
     }
     printf("\n>>>commonKeys size:%ld\n", commonKeys.size());
     //给参数赋值,重要
@@ -845,7 +846,9 @@ namespace osuCrypto
         H.Update(hashInputs[j - low], infoArg->matrixWidthInBytes);
         H.Final(hashOutput);
         //生成一个map并保存
-        infoArg->hashMap[0][*(u64 *)hashOutput].push_back(
+        // infoArg->hashMap[0][*(u64 *)hashOutput].push_back(
+        //     std::make_pair(*(block *)hashOutput, j));
+        infoArg->hashMap[0][*(u64 *)hashOutput].emplace_back(
             std::make_pair(*(block *)hashOutput, j));
       }
     }
@@ -982,7 +985,8 @@ namespace osuCrypto
           if (memcmp(&(found->second[j].first), recvBuff + offset,
                      this->hash2LengthInBytes) == 0)
           {
-            psiMsgIndex->push_back(found->second[j].second);
+            // psiMsgIndex->push_back(found->second[j].second);
+            psiMsgIndex->emplace_back(found->second[j].second);
             break;
           }
         }
@@ -1318,7 +1322,8 @@ namespace osuCrypto
     {
       block comKey;
       this->commonPrng->get((u8 *)&comKey, sizeof(block));
-      commonKeys.push_back(comKey);
+      // commonKeys.push_back(comKey);
+      commonKeys.emplace_back(comKey);
     }
     printf("\n>>>commonKeys size:%ld\n", commonKeys.size());
     //最重要的一步，取出 choicesWidthInput
@@ -1326,7 +1331,8 @@ namespace osuCrypto
     vector<int> choiceVector;
     for (int i = 0; i < choiceSize; i++)
     {
-      choiceVector.push_back(this->choicesWidthInput[i]);
+      // choiceVector.push_back(this->choicesWidthInput[i]);
+      choiceVector.emplace_back(this->choicesWidthInput[i]);
     }
     //给参数赋值
     for (int k = 0; k < threadNum; k++)

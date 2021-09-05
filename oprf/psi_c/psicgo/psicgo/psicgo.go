@@ -9,6 +9,7 @@ package psicgo
 import "C"
 import (
 	"errors"
+	"reflect"
 	"unsafe"
 )
 
@@ -54,4 +55,29 @@ func (s *PsiSender) GenPublicParam() (pubParam []byte, err error) {
 	pubParam = make([]byte, pub_param_buf_size)
 	C.memcpy(unsafe.Pointer(&pubParam[0]), unsafe.Pointer(pub_param_buf), C.ulong(pub_param_buf_size))
 	return pubParam, nil
+}
+
+//int gen_matrix_T_xor_R(void *psi_s, char *pk0s, const ui64 pk0s_size,
+//                           char **matrix_TxorR, ui64 *matrix_TxorR_size);
+func (s *PsiSender) GenMatrixTxorR(pk0s []byte) (matrixTxorR []byte, err error) {
+	head := (*reflect.SliceHeader)(unsafe.Pointer(&pk0s))
+	pk0Char := (*C.char)(unsafe.Pointer(head.Data))
+	pk0s_size := C.ulonglong(head.Len)
+	var matrix_TxorR *C.char
+	var matrix_TxorR_size uint64 = 0
+	ret := C.gen_matrix_T_xor_R(s.sender, pk0Char, pk0s_size, &matrix_TxorR,
+		(*C.ulongulong)(unsafe.Pointer(&matrix_TxorR_size)))
+	if int(ret) != 0 {
+		return nil, errors.New("gen_matrix_T_xor_R error for C")
+	}
+	matrixTxorR = make([]byte, matrix_TxorR_size)
+	headDest := (*reflect.SliceHeader)(unsafe.Pointer(&matrixTxorR))
+	C.memcpy(unsafe.Pointer(headDest.Data), unsafe.Pointer(matrix_TxorR), matrix_TxorR_size)
+	return matrixTxorR, nil
+}
+
+//int compute_all_hash_output_byH1(void *psi_s, const char **sender_set,
+//                                     const ui64 sender_size);
+func (s *PsiSender) ComputeAllHashOutputByH1() {
+
 }

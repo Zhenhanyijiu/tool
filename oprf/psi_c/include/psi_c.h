@@ -12,7 +12,7 @@ extern "C"
     int gen_matrix_T_xor_R(void *psi_s, char *pk0s, const ui64 pk0s_size,
                            char **matrix_TxorR, ui64 *matrix_TxorR_size);
     int compute_all_hash_output_byH1(void *psi_s, const char **sender_set,
-                                     const ui64 sender_size);
+                                     const ui64 sender_size, const int id_size);
     int recover_matrix_C(void *psi_s, const char *recv_matrix_A_xor_D,
                          const ui64 recv_matrix_A_xor_D_size);
     int is_send_end(void *psi_s);
@@ -24,7 +24,7 @@ extern "C"
     int gen_pk0s_from_npot(void *psi_r, char *pubParamBuf, const ui64 pubParamBufByteSize,
                            char **pk0Buf, ui64 *pk0BufSize);
     int get_matrix_AxorD(void *psi_r, const char *uBuffInputTxorR, const ui64 uBuffInputSize,
-                         const char **receiver_set, const ui64 receiver_set_size,
+                         const char **receiver_set, const ui64 receiver_set_size, const int id_size,
                          char **sendMatrixADBuff, ui64 *sendMatixADBuffSize);
     int gen_all_hash_map(void *psi_r);
     int is_recv_end(void *psi_r);
