@@ -45,7 +45,8 @@ namespace osuCrypto
         ~PsiSender();
         //初始化psiSender
         int init(u8_t *commonSeed, u64_t senderSize, u64_t matrixWidth, u64_t logHeight,
-                 int threadNum = 1, u64_t hash2LengthInBytes = 10, u64_t bucket2ForComputeH2Output = 256);
+                 int threadNum = 1, u64_t hash2LengthInBytes = 10,
+                 u64_t bucket2ForComputeH2Output = 256);
 
         //生成基本ot协议的公共参数，并发送给对方
         int genPublicParamFromNpot(u8_t **pubParamBuf, u64_t *pubParamBufByteSize);

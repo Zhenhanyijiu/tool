@@ -3,11 +3,9 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
-
 #include <algorithm>
 #include <fstream>
 #include <iostream>
-
 #include "channel.h"
 #include "cryptoTools/Common/BitVector.h"
 #include "cryptoTools/Common/CLP.h"
@@ -17,11 +15,8 @@
 #include "iknpote.h"
 #include "naorpinkas.h"
 #include "psi.h"
-// #define Psi_Size 5000
 namespace oc = osuCrypto;
-
 using namespace std;
-
 //时间统计us
 long start_time()
 {
@@ -52,12 +47,10 @@ void printOTMsgSingle(const vector<oc::block> &otMsg)
   for (int i = 0; i < num; i++)
   {
     cout << "第" << i + 1 << "个消息：" << otMsg[i] << endl;
-    // cout << "" << (1) << ":" << otMsg[i][1] << endl;
   }
 }
 void check_recover(const vector<array<oc::block, 2>> &otMsg,
-                   const oc::BitVector &rChoices,
-                   const vector<oc::block> &otMsgRecover)
+                   const oc::BitVector &rChoices, const vector<oc::block> &otMsgRecover)
 {
   unsigned int size = otMsg.size();
   if (size != rChoices.size() || size != otMsgRecover.size())
@@ -78,7 +71,6 @@ void check_recover(const vector<array<oc::block, 2>> &otMsg,
     printf("===check_recover ok...\n");
   }
 }
-
 // psi test use socket
 #if 1
 oc::u64 seed;
@@ -113,7 +105,6 @@ void generateDataSet(const int ptype, const oc::u64 dataSize, oc::u64 seed,
     for (oc::u64 i = 0; i < dataSet.size(); i++)
     {
       dataSet[i].resize(ids);
-      // dataSet[i] = prng.get<oc::block>();
       prng.get(dataSet[i].data(), ids);
     }
   }
@@ -185,8 +176,7 @@ void savePsiToFile(const char *fileName, const vector<oc::u32> &psiMsgIndexs,
   writeFileAllByCPP(fileName, buf, bufSize - 1);
   free(buf);
 }
-void generateDataFromFile(const char *inFile, vector<vector<oc::u8>> &dataSet,
-                          int ids)
+void generateDataFromFile(const char *inFile, vector<vector<oc::u8>> &dataSet, int ids)
 {
   long filesize = 0;
   char *bufread = readFileAllByCPP(inFile, &filesize);
@@ -233,9 +223,8 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
   assert(server);
   long start1 = start_time();
   //初始化psiRecv
-  int fg =
-      psiRecv.init(commonSeed, receiverSize, senderSize, matrixWidth, logHeight,
-                   omp_num, hash2LengthInBytes, bucket2ForComputeH2Output);
+  int fg = psiRecv.init(commonSeed, receiverSize, senderSize, matrixWidth, logHeight,
+                        omp_num, hash2LengthInBytes, bucket2ForComputeH2Output);
   assert(fg == 0);
   //接收对方的公共参数,并生成 pk0sBuf
   char *pubParamBuf = nullptr;
@@ -243,8 +232,7 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
   oc::u64 pk0sBufSize = 0;
   int n = recv_data(server, &pubParamBuf);
   assert(n > 0);
-  fg = psiRecv.genPK0FromNpot((oc::u8 *)pubParamBuf, n, (oc::u8 **)&pk0sBuf,
-                              &pk0sBufSize);
+  fg = psiRecv.genPK0FromNpot((oc::u8 *)pubParamBuf, n, (oc::u8 **)&pk0sBuf, &pk0sBufSize);
   assert(fg == 0);
   n = send_data(server, pk0sBuf, pk0sBufSize);
   //接收 uBuffInput,并生成matrixAD,并发送给对方
@@ -294,11 +282,9 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
     assert(n > 0);
     if (count < countTmp)
     {
-      printf("count:%d,recv:接收一次H2Ouput所需时间:%ldms\n", count,
-             get_use_time(start00));
+      printf("count:%d,recv:接收一次H2Ouput所需时间:%ldms\n", count, get_use_time(start00));
     }
-    fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput, n,
-                                                 &psiMsgIndexs);
+    fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput, n, &psiMsgIndexs);
     assert(fg == 0);
     if (count < countTmp)
     {
@@ -355,9 +341,8 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   assert(client);
   // psi 发送方
   long start2 = start_time();
-  int fg =
-      psiSender.init(commonSeed, senderSize, matrixWidth, logHeight, omp_num,
-                     hash2LengthInBytes, bucket2ForComputeH2Output);
+  int fg = psiSender.init(commonSeed, senderSize, matrixWidth, logHeight, omp_num,
+                          hash2LengthInBytes, bucket2ForComputeH2Output);
   assert(fg == 0);
   //[1]生成基本ot协议的公共参数，并发送给对方
   oc::u8 *pubParamBuf = nullptr;
@@ -374,8 +359,7 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   oc::u64 uBuffOutputSize = 0;
   //[3]输入pk0s，生成uBuffOutput,并发送给对方
   long start_TxorR = start_time();
-  fg = psiSender.genMatrixTxorRBuff((oc::u8 *)pk0sBuf, n, &uBuffOutput,
-                                    &uBuffOutputSize);
+  fg = psiSender.genMatrixTxorRBuff((oc::u8 *)pk0sBuf, n, &uBuffOutput, &uBuffOutputSize);
   printf("===>>发送方生成TxorR矩阵用时:%ld ms\n", get_use_time(start_TxorR));
   assert(fg == 0);
   n = send_data(client, (char *)uBuffOutput, uBuffOutputSize);
@@ -398,8 +382,7 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   printf("===>>recoverMatrixC所需时间:%ldms\n", get_use_time(start3));
   printf("===>>OT所需时间:%ldms\n", get_use_time(start2));
   //循环发送hash输出给对方
-  vector<oc::u8> hashOutputOnceBuff(hash2LengthInBytes *
-                                    bucket2ForComputeH2Output);
+  vector<oc::u8> hashOutputOnceBuff(hash2LengthInBytes * bucket2ForComputeH2Output);
   oc::u64 hashOutputOnceBuffSize = 0;
   int totalCyc = senderSize / bucket2ForComputeH2Output;
   int count = 0, countTmp = 10;
@@ -421,27 +404,25 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
     assert(fg == 0);
     if (count < countTmp)
     {
-      printf("count:%d,send:计算一次H2Output所需时间:%ldms\n", count,
-             get_use_time(start00));
+      printf("count:%d,send:计算一次H2Output所需时间:%ldms\n", count, get_use_time(start00));
     }
-    n = send_data(client, (char *)hashOutputOnceBuff.data(),
-                  hashOutputOnceBuffSize);
+    n = send_data(client, (char *)hashOutputOnceBuff.data(), hashOutputOnceBuffSize);
     assert((oc::u64)n == hashOutputOnceBuffSize);
     if (count < countTmp)
     {
-      printf("count:%d,send:计算一次H2Output并发送所需时间:%ldms\n", count,
-             get_use_time(start00));
+      printf("count:%d,send:计算一次H2Output并发送所需时间:%ldms\n", count, get_use_time(start00));
     }
     count++;
   }
 
   printf("===>>count:%d\n", count);
-  printf("sender: 匹配find用时：%ldms,totalCyc:%d\n", get_use_time(start4),
-         totalCyc);
+  printf("sender: 匹配find用时：%ldms,totalCyc:%d\n", get_use_time(start4), totalCyc);
   printf("sender: 总用时:%ldms\n", get_use_time(start2));
   // //释放mem, sender
   releaseChannel(client);
   printf("sender:----------->>>>>>main over \n");
+  // sleep(20);
+  assert(1 == 3);
 }
 int main(int argc, char **argv)
 {
@@ -540,7 +521,6 @@ int main(int argc, char **argv)
       send_process(inFile, outFile, receiverSize, senderSize, ids, address,
                    port, commonSeed, matrixWidth, logHeight, hash2LengthInBytes,
                    bucket2ForComputeH2Output, omp_num);
-      // return 0;
     }
     if (ptype == SERVER) // recv
     {
