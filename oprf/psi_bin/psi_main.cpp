@@ -284,13 +284,15 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
     {
       printf("count:%d,recv:接收一次H2Ouput所需时间:%ldms\n", count, get_use_time(start00));
     }
-    fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput, n, &psiMsgIndexs);
+    vector<oc::u32> psiMsgIndexsTmp;
+    fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput, n, &psiMsgIndexsTmp);
     assert(fg == 0);
     if (count < countTmp)
     {
       printf("count:%d,recv:接收一次H2Ouput并匹配所需时间:%ldms\n", count,
              get_use_time(start00));
     }
+    psiMsgIndexs.insert(psiMsgIndexs.end(), psiMsgIndexsTmp.begin(), psiMsgIndexsTmp.end());
     count++;
   }
   //   printf("*********test********\n");

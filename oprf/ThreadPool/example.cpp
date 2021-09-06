@@ -30,8 +30,10 @@ int main()
             pool.enqueue(process, i));
     }
     printf("===>>results.size:%ld\n", results.size());
-    for (auto &&result : results)
-        std::cout << result.get() << ' ';
+    // for (auto &&result : results)
+    //     std::cout << result.get() << ' ';
+    for (int i = 0; i < results.size(); i++)
+        std::cout << results[i].get() << ' ';
     std::cout << std::endl;
 
     return 0;

@@ -1,4 +1,5 @@
 #include "iknpote.h"
+#include "ThreadPool.h"
 #include <unordered_map>
 #include <vector>
 namespace osuCrypto
@@ -99,6 +100,8 @@ namespace osuCrypto
         vector<unordered_map<u64, std::vector<std::pair<block, u32_t>>>> HashMapVector;
         IknpOtExtSender iknpOteSender;
         u64 lowL;
+        // ThreadPool *psiComputePool;
+        // std::vector<std::future<int>> results;
 
     public:
         PsiReceiver();

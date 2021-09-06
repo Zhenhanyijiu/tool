@@ -1,12 +1,11 @@
 #include "psi.h"
-
 #include <assert.h>
 #include <cryptoTools/Crypto/RandomOracle.h>
 #include <omp.h>
 #include <pthread.h>
 #include <sys/time.h>
 #include <unistd.h>
-
+#include <string.h>
 #include <cstdint>
 namespace osuCrypto
 {
@@ -27,7 +26,10 @@ namespace osuCrypto
 
   // psiReceiver
   PsiReceiver::PsiReceiver() {}
-  PsiReceiver::~PsiReceiver() {}
+  PsiReceiver::~PsiReceiver()
+  {
+    // delete this->psiComputePool;
+  }
   int PsiReceiver::init(u8_t *commonSeed, u64_t receiverSize, u64_t senderSize,
                         u64_t matrixWidth, u64_t logHeight, int threadNum,
                         u64_t hash2LengthInBytes, u64_t bucket2ForComputeH2Output)
@@ -395,7 +397,8 @@ namespace osuCrypto
         H.Update(hashInputs[j - low], this->matrixWidthInBytes);
         H.Final(hashOutput);
         //生成一个map并保存
-        this->allHashes[*(u64 *)hashOutput].push_back(std::make_pair(*(block *)hashOutput, j));
+        // this->allHashes[*(u64 *)hashOutput].push_back(std::make_pair(*(block *)hashOutput, j));
+        this->allHashes[*(u64 *)hashOutput].emplace_back(std::make_pair(*(block *)hashOutput, j));
       }
     }
     for (auto i = 0; i < this->bucket2ForComputeH2Output; ++i)
@@ -429,7 +432,8 @@ namespace osuCrypto
                    recvBuff + idx * this->hash2LengthInBytes,
                    this->hash2LengthInBytes) == 0)
         {
-          psiMsgIndex->push_back(found->second[i].second);
+          // psiMsgIndex->push_back(found->second[i].second);
+          psiMsgIndex->emplace_back(found->second[i].second);
           break;
         }
       }
@@ -1199,7 +1203,120 @@ namespace osuCrypto
     }
     return 0;
   }
+  /********************
+  //并行处理 匹配逻辑,采用在外部进行omp指令，性能比在外部还要慢5倍以上
+  typedef struct ComputePsiInfo
+  {
+    //1
+    int threadId;
+    //2
+    const u8_t *recvBuffStart;
+    //3
+    u64 processNum;
+    //4
+    u64 hash2LengthInBytes;
+    //5
+    u64 hashMapSize;
+    //6
+    unordered_map<u64, std::vector<std::pair<block, u32_t>>> *hashMapPtr;
+    //7
+    vector<u32_t> *psiIndexVecTempPtr;
+  } ComputePsiInfo;
+  void process_compute_psi_omp(ComputePsiInfo *infoArg)
+  {
+    // printf(">>>(process_compute_psi_omp)omp thread id:%d\n", infoArg->threadId);
+    for (auto idx = 0; idx < infoArg->processNum; ++idx)
+    {
+      u64 mapIdx = *(u64 *)(infoArg->recvBuffStart + idx * infoArg->hash2LengthInBytes);
+      for (int i = 0; i < infoArg->hashMapSize; i++)
+      {
+        auto found = infoArg->hashMapPtr[i].find(mapIdx);
+        if (found == infoArg->hashMapPtr[i].end())
+          continue;
+        //可能找到好几个
+        for (auto i = 0; i < found->second.size(); ++i)
+        {
+          if (memcmp(&(found->second[i].first),
+                     infoArg->recvBuffStart + idx * infoArg->hash2LengthInBytes,
+                     infoArg->hash2LengthInBytes) == 0)
+          {
+            // (infoArg->psiIndexVecTempPtr)[0].push_back(found->second[i].second);
+            (infoArg->psiIndexVecTempPtr)[0].emplace_back(found->second[i].second);
+            break;
+          }
+        }
+      }
+    }
+  }
+  //PsiReceiver,接收对方发来的hash输出
+  int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
+                                                   vector<u32_t> *psiMsgIndex)
+  {
+    auto up = this->lowL + this->bucket2ForComputeH2Output < this->senderSize ? this->lowL + this->bucket2ForComputeH2Output : this->senderSize;
+    if (recvBufSize != (up - this->lowL) * this->hash2LengthInBytes)
+    {
+      return -122;
+    }
+    u64 threadNum = this->threadNumOmp;
+    vector<vector<u32_t>> psiIndexVecTemp(threadNum);
+    ComputePsiInfo infoArgs[threadNum];
+    memset((char *)infoArgs, 0, sizeof(ComputePsiInfo) * threadNum);
+    u64 processNumAll = up - this->lowL;
+    u64 processNum = up / threadNum;
+    //取余
+    // u64 remain = up & (threadNumOmp - 1);
+    u64 remain = up % threadNum;
+    for (int i = 0; i < threadNum; i++)
+    {
+      //1
+      infoArgs[i].threadId = i;
+      //3
+      if (i < threadNum - 1)
+      {
+        infoArgs[i].processNum = processNum;
+      }
+      else
+      {
+        infoArgs[i].processNum = processNum + remain;
+      }
+      //2
+      infoArgs[i].recvBuffStart = recvBuff + processNum * i;
+      //4
+      infoArgs[i].hash2LengthInBytes = this->hash2LengthInBytes;
+      //5
+      infoArgs[i].hashMapSize = threadNum;
+      //6
+      infoArgs[i].hashMapPtr = (unordered_map<u64, std::vector<std::pair<block, u32_t>>> *)(this->HashMapVector.data());
+      //7
+      infoArgs[i].psiIndexVecTempPtr = (vector<u32_t> *)(psiIndexVecTemp.data()) + i;
+    }
+
+#pragma omp parallel for num_threads(threadNum)
+    for (int i = 0; i < threadNum; i++)
+    {
+      process_compute_psi_omp(infoArgs + i);
+    }
+    this->lowL += this->bucket2ForComputeH2Output;
+    u64_t sum_len = 0;
+    for (int i = 0; i < threadNum; i++)
+    {
+      // psiMsgIndex->insert(psiMsgIndex->end(), psiIndexVecTemp[i].begin(), psiIndexVecTemp[i].end());
+      sum_len += psiIndexVecTemp[i].size();
+    }
+    psiMsgIndex->resize(sum_len);
+    u64_t offset = 0;
+    for (int i = 0; i < threadNum; i++)
+    {
+      memcpy(psiMsgIndex->data() + offset, psiIndexVecTemp[i].data(),
+             sizeof(u32_t) * psiIndexVecTemp[i].size());
+      offset += psiIndexVecTemp[i].size();
+    }
+    return 0;
+  }
+
+*******************/
   // PsiReceiver,接收对方发来的hash输出
+
   int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8_t *recvBuff,
                                                    const u64_t recvBufSize,
                                                    vector<u32_t> *psiMsgIndex)
@@ -1217,6 +1334,7 @@ namespace osuCrypto
     {
       u64 mapIdx = *(u64 *)(recvBuff + offset);
       // #pragma omp parallel for num_threads(this->threadNumOmp)
+      //这里加omp指令并不能提高性能，反而下降一倍多
       for (int i = 0; i < this->HashMapVector.size(); i++)
       {
         auto found = this->HashMapVector[i].find(mapIdx);
@@ -1238,6 +1356,7 @@ namespace osuCrypto
     this->lowL += this->bucket2ForComputeH2Output;
     return 0;
   }
+
   //////////////psi-sender//////////////////
   //计算所有id的hash1值，备用
   int PsiSender::computeAllHashOutputByH1(const vector<vector<u8_t>> senderSet)
