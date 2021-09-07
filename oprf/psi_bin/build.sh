@@ -35,7 +35,6 @@ BLAKE2_DIR=../../libOTe/cryptoTools/cryptoTools/Crypto/blake2
 g++ -std=gnu++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
 -DENABLE_MIRACL \
 -DOMP \
--DNDEBUG \
 -I${CRYPTO_INCLUDE} -I${THIRD_INCLUDE}/miracl \
 -I${THIRD_INCLUDE}/miracl/miracl/include \
 -I${BLAKE2_DIR} \

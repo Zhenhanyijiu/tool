@@ -100,8 +100,10 @@ namespace osuCrypto
         vector<unordered_map<u64, std::vector<std::pair<block, u32_t>>>> HashMapVector;
         IknpOtExtSender iknpOteSender;
         u64 lowL;
-        // ThreadPool *psiComputePool;
-        // std::vector<std::future<int>> results;
+        u32_t indexId;
+        ThreadPool *psiComputePool;
+        vector<vector<u32_t>> psiResults;
+        std::vector<std::future<u32_t>> psiResultsIndex;
 
     public:
         PsiReceiver();
@@ -132,8 +134,13 @@ namespace osuCrypto
                                             u64 low, u64 up, vector<int> &psiMsgIndex)
         }
         */
+#ifdef OMP_ONLY
         int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
                                             vector<u32_t> *psiMsgIndex);
+#else
+        int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize);
+        int getPsiResultsForAll(vector<u32_t> *psiResultsOutput);
+#endif
     };
     // void generateDataSetDebug(const int ptype, const u64_t dataSize, const u64_t psiSize,
     //                           u64_t seed, u64_t ids, vector<vector<u8_t>> *dataSet);

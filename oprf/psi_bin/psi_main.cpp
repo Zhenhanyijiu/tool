@@ -255,7 +255,7 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
   printf("===>>recv:生成hashMap表所需时间:%ld ms\n", get_use_time(start3));
   //循环接收对方发来的hashOutput
   long start4 = start_time();
-  char *hashOutput = nullptr;
+  // char *hashOutput = nullptr;
   vector<oc::u32> psiMsgIndexs;
   int totalCyc = senderSize / bucket2ForComputeH2Output;
   printf("===>>sendersize:%ld,bucket2ForComputeH2Output:%d,totalCyc:%d\n",
@@ -264,6 +264,7 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
   long int start00;
   for (; psiRecv.isRecvEnd() == 0;)
   {
+    char *hashOutput = nullptr;
     if (count < countTmp)
     {
       start00 = start_time();
@@ -284,6 +285,7 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
     {
       printf("count:%d,recv:接收一次H2Ouput所需时间:%ldms\n", count, get_use_time(start00));
     }
+#ifdef OMP_ONLY
     vector<oc::u32> psiMsgIndexsTmp;
     fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput, n, &psiMsgIndexsTmp);
     assert(fg == 0);
@@ -294,7 +296,22 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
     }
     psiMsgIndexs.insert(psiMsgIndexs.end(), psiMsgIndexsTmp.begin(), psiMsgIndexsTmp.end());
     count++;
+#else
+    fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput, n);
+    assert(fg == 0);
+    if (count < countTmp)
+    {
+      printf("count:%d,pool recv:接收一次H2Ouput并匹配所需时间:%ldms\n", count, get_use_time(start00));
+    }
+    count++;
+#endif
   }
+#ifdef OMP_ONLY
+#else
+  fg = psiRecv.getPsiResultsForAll(&psiMsgIndexs);
+  printf("============>>getPsiResultsForAll fg:%d\n", fg);
+  assert(fg == 0);
+#endif
   //   printf("*********test********\n");
   //   n = recv_data(server, &hashOutput);
   //   printf("*********test(n=%d)********\n", n);
@@ -302,8 +319,9 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
   printf("===>>recv: 匹配find用时：%ldms,totalCyc:%d,count:%d\n",
          get_use_time(start4), totalCyc, count);
   printf("===>>recv:总用时：%ldms\n", get_use_time(start1));
-  printf("===>>psi count:%ld,最后索引:%d\n", psiMsgIndexs.size(),
-         psiMsgIndexs[psiMsgIndexs.size() - 1]);
+  // printf("===>>psi count:%ld,最后索引:%d\n", psiMsgIndexs.size(),
+  //        psiMsgIndexs[psiMsgIndexs.size() - 1]);
+  printf("===>>psi count:%ld\n", psiMsgIndexs.size());
   assert(psiMsgIndexs.size() == Psi_Size);
   long start5 = start_time();
   if (outFile != "")
@@ -424,7 +442,7 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   releaseChannel(client);
   printf("sender:----------->>>>>>main over \n");
   // sleep(20);
-  assert(1 == 3);
+  // assert(1 == 3);
 }
 int main(int argc, char **argv)
 {
@@ -453,6 +471,7 @@ int main(int argc, char **argv)
   printf("===>>公共种子用于测试sd:%ld\n", seed);
   //交集个数
   cmd.setDefault("ps", 2000000);
+  // cmd.setDefault("ps", 20000);
   Psi_Size = cmd.get<oc::u64>("ps");
   printf("===>>双方交集个数用于测试，ps:%ld\n", Psi_Size);
   //数据文件路径
