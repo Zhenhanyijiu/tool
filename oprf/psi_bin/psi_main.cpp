@@ -319,9 +319,9 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
   printf("===>>recv: 匹配find用时：%ldms,totalCyc:%d,count:%d\n",
          get_use_time(start4), totalCyc, count);
   printf("===>>recv:总用时：%ldms\n", get_use_time(start1));
-  // printf("===>>psi count:%ld,最后索引:%d\n", psiMsgIndexs.size(),
-  //        psiMsgIndexs[psiMsgIndexs.size() - 1]);
-  printf("===>>psi count:%ld\n", psiMsgIndexs.size());
+  printf("===>>psi count:%ld,最后索引:%d\n", psiMsgIndexs.size(),
+         psiMsgIndexs[psiMsgIndexs.size() - 1]);
+  // printf("===>>psi count:%ld\n", psiMsgIndexs.size());
   assert(psiMsgIndexs.size() == Psi_Size);
   long start5 = start_time();
   if (outFile != "")
@@ -534,7 +534,7 @@ int main(int argc, char **argv)
   oc::u8_t commonSeed[16];
   memset(commonSeed, 0, 16);
   memcpy(commonSeed, (oc::u8_t *)&comSeed, 8);
-  for (int i = 0; i < 1; i++)
+  for (int i = 0; i < 10; i++)
   {
     long start0 = start_time();
     if (ptype == CLIENT)
@@ -548,10 +548,12 @@ int main(int argc, char **argv)
       recv_process(inFile, outFile, receiverSize, senderSize, ids, address,
                    port, commonSeed, matrixWidth, logHeight, hash2LengthInBytes,
                    bucket2ForComputeH2Output, omp_num);
-
       // return 0;
     }
     printf("===>>(%d)测试用时：%ld ms\n", i, get_use_time(start0));
+    int sl = 30;
+    sleep(sl);
+    printf("==============>>i(%d)睡眠了%d s，开始下一次测试\n", i, sl);
   }
 
   // sleep(1000);
