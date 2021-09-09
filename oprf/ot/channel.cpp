@@ -15,47 +15,53 @@
 // #define RECV_BUFF_SIZE 256
 typedef struct Timeout
 {
-    int is_first;
+    // int is_first;
     int inerval_sec;
-    struct timeval start;
-    struct timeval end;
+    long start_time;
+    // struct timeval start;
+    // struct timeval end;
 
 } Timeout;
+
 Timeout *new_timiout(int second)
 {
     Timeout *t = (Timeout *)malloc(sizeof(Timeout));
     if (t)
     {
-        t->is_first = 1;
+        memset(t, 0, sizeof(Timeout));
+        // t->is_first = 1;
         t->inerval_sec = second;
+        struct timeval start;
+        gettimeofday(&start, nullptr);
+        t->start_time = start.tv_sec * 1000000 + start.tv_usec;
     }
     return t;
 }
-int is_timeout(Timeout **tout)
+
+int is_timeout(Timeout *tout)
 {
-    if (tout && *tout)
+    if (tout)
     {
-        if ((*tout)->is_first)
+        struct timeval end;
+        gettimeofday(&end, nullptr);
+        long time_use = end.tv_sec * 1000000 + end.tv_usec - tout->start_time;
+        long time_out_val = tout->inerval_sec * 1000000;
+        if (time_use >= time_out_val) //set time-out 1s
         {
-            (*tout)->is_first = 0;
-            gettimeofday(&(*tout)->start, NULL);
-            return 0;
+            printf("error timeout,time_use:%ld,tout->inerval:%ld\n", time_use, time_out_val);
+            return 1;
         }
-        else
-        {
-            gettimeofday(&(*tout)->end, NULL);
-            int time_use = ((*tout)->end.tv_sec - (*tout)->start.tv_sec) * 1000000 +
-                           ((*tout)->end.tv_usec - (*tout)->start.tv_usec);
-            if (time_use >= (*tout)->inerval_sec * 1e6) //set time-out 1s
-            {
-                free(*tout);
-                *tout = NULL;
-                return 1;
-            }
-            return 0;
-        }
+        return 0;
     }
     return 1;
+}
+
+void release_timeout(Timeout *tout)
+{
+    if (tout)
+    {
+        free(tout);
+    }
 }
 
 struct Channel
@@ -65,14 +71,14 @@ struct Channel
     char *recv_buff;
     int recv_buff_len;
 };
+
 void *initChannel(PartType pltype, const char *address, int port)
 {
     if (pltype == CLIENT)
     {
         int socket_fd = 0; //socket句柄
-        unsigned int iRemoteAddr = 0;
-        struct sockaddr_in stRemoteAddr = {0}; //对端，即目标地址信息
-
+        // unsigned int iRemoteAddr = 0;
+        struct sockaddr_in stRemoteAddr = {0};       //对端，即目标地址信息
         socket_fd = socket(AF_INET, SOCK_STREAM, 0); //建立socket
         if (0 > socket_fd)
         {
@@ -93,13 +99,11 @@ void *initChannel(PartType pltype, const char *address, int port)
             int fg = connect(socket_fd, (struct sockaddr *)&stRemoteAddr, sizeof(stRemoteAddr));
             if (fg < 0)
             {
-                // printf("连接失败 connect error,重试中！\n");
-                // close(socket_fd);
-                // return nullptr;
-                if (is_timeout(&t))
+                if (is_timeout(t))
                 {
-                    printf("连接失败 connect error！\n");
+                    printf("连接失败 connect error dial timeout！\n");
                     close(socket_fd);
+                    release_timeout(t);
                     return nullptr;
                 }
                 continue;
@@ -110,19 +114,20 @@ void *initChannel(PartType pltype, const char *address, int port)
                 break;
             }
         }
+        release_timeout(t);
 
         // printf("连接成功！\n");
         // recv(iSocketFD, buf, sizeof(buf), 0);
         //将接收数据打入buf，参数分别是句柄，储存处，最大长度，其他信息（设为0即可）。 
         // printf("Received:%s\n", buf);
         Channel *ch = (Channel *)malloc(sizeof(Channel));
-        if (ch == NULL)
+        if (ch == nullptr)
         {
             close(socket_fd);
             return nullptr;
         }
         ch->recv_buff = (char *)malloc(RECV_BUFF_SIZE); //100M
-        if (ch->recv_buff == NULL)
+        if (ch->recv_buff == nullptr)
         {
             free(ch);
             close(socket_fd);
@@ -173,7 +178,7 @@ void *initChannel(PartType pltype, const char *address, int port)
             return nullptr;
         }
         //设置服务器上的socket为监听状态
-        if (listen(socket_fd, 5) < 0)
+        if (listen(socket_fd, 1) < 0)
         {
             printf("listen error\n");
             close(socket_fd);
@@ -187,14 +192,14 @@ void *initChannel(PartType pltype, const char *address, int port)
         }
 
         Channel *ch = (Channel *)malloc(sizeof(Channel));
-        if (ch == NULL)
+        if (ch == nullptr)
         {
             close(conn);
             close(socket_fd);
             return nullptr;
         }
         ch->recv_buff = (char *)malloc(RECV_BUFF_SIZE); //100M
-        if (ch->recv_buff == NULL)
+        if (ch->recv_buff == nullptr)
         {
             free(ch);
             close(conn);
@@ -229,14 +234,14 @@ int releaseChannel(void *ch)
         free(c->recv_buff);
         c->recv_buff = nullptr;
         free(ch);
-        ch = NULL;
+        ch = nullptr;
     }
     return 0;
 }
 
 int send_data(void *channel, const char *buff, int buf_size)
 {
-    if (channel == NULL || buf_size < 0)
+    if (channel == nullptr || buf_size < 0)
     {
         return -120;
     }
@@ -281,24 +286,54 @@ int send_data(void *channel, const char *buff, int buf_size)
 }
 int recv_data(void *channel, char **buff_output)
 {
-    if (channel == NULL)
+    if (channel == nullptr)
     {
         printf("error...1\n");
         return -122;
     }
     Channel *chan = (Channel *)channel;
     uint32_t headlen = 0;
-    int n = recv(chan->conn, (char *)&headlen, 4, 0);
-    if (n != 4)
+    int n = 0;
+    // int n = recv(chan->conn, (char *)&headlen, 4, 0);
+    // if (n != 4)
+    // {
+    //     printf("error...2。n(%d)\n", n);
+    //     return -110;
+    // }
+
+    //读四个字节头
+    int offset = 0;
+    int remain_len = 4;
+    while (1)
     {
-        printf("error...2。n(%d)\n", n);
-        return -110;
+        n = recv(chan->conn, (char *)(&headlen) + offset, remain_len, 0);
+        if (n < 0)
+        {
+            printf("recv error in head,n:%d\n", n);
+            return -111;
+        }
+        if (n == 0)
+        {
+            printf("connection closed!,n:%d\n", n);
+            return 0;
+        }
+        offset += n;
+        if (offset < 4)
+        {
+            remain_len = 4 - offset;
+            continue;
+        }
+        else
+        {
+            break;
+        }
     }
+
     //空间不够
     if (headlen > chan->recv_buff_len)
     {
         char *tmp_buf = (char *)realloc(chan->recv_buff, headlen);
-        if (tmp_buf == NULL)
+        if (tmp_buf == nullptr)
         {
             printf("error...3\n");
             return -112;
@@ -308,8 +343,8 @@ int recv_data(void *channel, char **buff_output)
         memset(chan->recv_buff, 0, headlen);
     }
     //这里要循环接收数据
-    int offset = 0;
-    int remain_len = headlen;
+    offset = 0;
+    remain_len = headlen;
     // int count = 0;
     while (1)
     {
@@ -318,6 +353,11 @@ int recv_data(void *channel, char **buff_output)
         {
             printf("error...4,n(%d),headlen(%d)\n", n, headlen);
             return -111;
+        }
+        if (n == 0)
+        {
+            printf("connection closed!,n:%d\n", n);
+            return 0;
         }
         // count++;
         offset += n;

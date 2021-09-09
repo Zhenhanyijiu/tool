@@ -534,7 +534,7 @@ int main(int argc, char **argv)
   oc::u8_t commonSeed[16];
   memset(commonSeed, 0, 16);
   memcpy(commonSeed, (oc::u8_t *)&comSeed, 8);
-  for (int i = 0; i < 10; i++)
+  for (int i = 0; i < 1; i++)
   {
     long start0 = start_time();
     if (ptype == CLIENT)
@@ -550,10 +550,10 @@ int main(int argc, char **argv)
                    bucket2ForComputeH2Output, omp_num);
       // return 0;
     }
-    printf("===>>(%d)测试用时：%ld ms\n", i, get_use_time(start0));
+    printf("===>>(%d)测试用时：%ld ms,sizeof(long):%ld\n", i, get_use_time(start0), sizeof(long));
     int sl = 30;
-    sleep(sl);
-    printf("==============>>i(%d)睡眠了%d s，开始下一次测试\n", i, sl);
+    // sleep(sl);
+    // printf("==============>>i(%d)睡眠了%d s，开始下一次测试\n", i, sl);
   }
 
   // sleep(1000);
