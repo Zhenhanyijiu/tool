@@ -10,12 +10,12 @@ from Crypto.Cipher import AES
 
 class Receiver(object):
     def __init__(self, common_deed: bytes, receiver_size: int, sender_size: int,
-                 matrix_width: int = 128, omp_thread_num: int = 1):
-        self.psi_msg_index = list()
+                 omp_thread_num: int = 1, matrix_width: int = 128):
+        # self.psi_msg_index = list()
         self.receiver_size = receiver_size
         self.sender_size = sender_size
         self.PsiReceiver = OprfPsiReceiver(common_deed, receiver_size, sender_size,
-                                           matrix_width, omp_thread_num)
+                                           omp_thread_num, matrix_width)
 
     def gen_pk0s(self, public_param: bytes):
         return self.PsiReceiver.gen_pk0s(public_param)
@@ -32,10 +32,16 @@ class Receiver(object):
     def is_receiver_end(self) -> bool:
         return self.PsiReceiver.is_receiver_end()
 
+    # def compute_psi_by_hash2_output(self, hash2_from_sender: bytes):
+    #     psi_index = self.PsiReceiver.compute_psi_by_hash2_output(
+    #         hash2_from_sender)
+    #     self.psi_msg_index += psi_index
+
     def compute_psi_by_hash2_output(self, hash2_from_sender: bytes):
-        psi_index = self.PsiReceiver.compute_psi_by_hash2_output(
-            hash2_from_sender)
-        self.psi_msg_index += psi_index
+        self.PsiReceiver.compute_psi_by_hash2_output(hash2_from_sender)
+
+    def get_psi_results_for_all(self) -> list:
+        return self.PsiReceiver.get_psi_results_for_all()
 
 
 class Server(object):
@@ -108,13 +114,13 @@ class Server(object):
 
 
 def parse_args(argv):
-    psi_size, sender_size, receiver_size, ip, port = 50, 200, 200, '127.0.0.1', 8888
+    psi_size, sender_size, receiver_size, ip, port, omp_thread_num = 50, 200, 200, '127.0.0.1', 8888, 1
     if len(argv[1:]) == 0:
         print('test.py --rs <500> --ss <500> --ps <100>')
         sys.exit(2)
     try:
         opts, args = getopt.getopt(
-            argv[1:], None, ["rs=", "ss=", "ps=", "ip=", "port=", "help="])
+            argv[1:], None, ["rs=", "ss=", "ps=", "ip=", "port=", "omp=", "help="])
     except getopt.GetoptError:
         print('test.py --rs <500> --ss <500> --ps <100>')
         sys.exit(2)
@@ -132,14 +138,16 @@ def parse_args(argv):
             ip = arg
         if opt in ('--port'):
             port = int(arg)
-    return receiver_size, sender_size, psi_size, ip, port
+        if opt in ('--omp'):
+            omp_thread_num = int(arg)
+    return receiver_size, sender_size, psi_size, ip, port, omp_thread_num
 
 
 def get_use_time(start: int) -> float:
     return (time.time_ns() - start) / 1e6
 
 
-def recv_pro(receiver_size, sender_size, psi_size, ip, port):
+def recv_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num: int = 1):
     server = Server(ip, port)
     start0 = time.time_ns()
     receiver_set = server.test_gen_data_set(receiver_size, psi_size)
@@ -151,7 +159,7 @@ def recv_pro(receiver_size, sender_size, psi_size, ip, port):
     # bytearray(b'1111111111111112')
     # 2. 创建接收方对象
     start1 = time.time_ns()
-    psi_recv = Receiver(common_seed, receiver_size, sender_size, omp_thread_num=4)
+    psi_recv = Receiver(common_seed, receiver_size, sender_size, omp_thread_num)
 
     # 3. 接收对方发来的公共参数public_param
     public_param = server.recv_data()
@@ -181,22 +189,23 @@ def recv_pro(receiver_size, sender_size, psi_size, ip, port):
         # print("===>>hash2_output_val length:", len(hash2_output_val))
         psi_recv.compute_psi_by_hash2_output(hash2_output_val)
         count_debug += 1
+    # 11.最后获取psi结果
+    psi_results = psi_recv.get_psi_results_for_all()
     print("===>>匹配用时：{}ms,循环次数：{}".format(get_use_time(start4), count_debug))
     print("===>>recv总用时：{}ms".format(get_use_time(start1)))
-    print('交集最后一个元素：', psi_recv.psi_msg_index[-1])
-    assert psi_size == (psi_recv.psi_msg_index[-1] + 1)
-    # psi_recv.gen_matrix_A_xor_D()
+    print('交集最后一个元素：', psi_results[-1])
+    assert psi_size == (psi_results[-1] + 1)
     print('===>>接收方求交结束...')
     pass
 
 
 if __name__ == '__main__':
-    receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
+    receiver_size, sender_size, psi_size, ip, port, omp_thread_num = parse_args(sys.argv)
     print('receiver_size, sender_size, psi_size, ip, port=',
-          receiver_size, sender_size, psi_size, ip, port)
-    print("===================")
+          receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
+    print("=========psi receiver==========")
 
     for i in range(1):
-        recv_pro(receiver_size, sender_size, psi_size, ip, port)
+        recv_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
         print("{}===>>end".format(i))
     # time.sleep(100)

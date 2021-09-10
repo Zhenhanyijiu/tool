@@ -61,14 +61,15 @@ def start_setup():
     include_dirs.append(THIRD_INCLUDE + "/miracl")
     include_dirs.append(THIRD_INCLUDE + "/miracl/miracl/include")
     # 宏定义
-    define_macros = [('ENABLE_MIRACL', None)]
+    define_macros = [('ENABLE_MIRACL', None), ('OMP', None), ('NDEBUG', None)]
     # 其他编译条件，-std=gnu++11,-std=c++11
-    extra_compile_args = ['-std=c++11', '-Wall', '-O2',
+    extra_compile_args = ['-std=c++11', '-Wall', '-O2', '-fopenmp',
                           '-msse3', '-msse2', '-msse4.1', '-maes', '-mpclmul']
+    extra_link_args = ['-lgomp']
     # 依赖库路径，-L
     library_dirs = [THIRD_INCLUDE + "/miracl/miracl/source/"]
     # 库名，-l
-    libraries = ['miracl']
+    libraries = ['miracl', 'pthread']
     ext1 = Extension("oprf_psi",
                      sources=source_files,
                      include_dirs=include_dirs,
@@ -76,6 +77,7 @@ def start_setup():
                      library_dirs=library_dirs,
                      libraries=libraries,
                      extra_compile_args=extra_compile_args,
+                     extra_link_args=extra_link_args,
                      language='c++')
     setup(
         cmdclass={'build_ext': build_ext},

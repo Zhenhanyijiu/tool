@@ -40,15 +40,17 @@ cdef extern from "psi.h" namespace "osuCrypto":
                                 u8_t ** sendMatrixADBuff, u64_t *sendMatixADBuffSize)
         int genenateAllHashesMap()
         int isRecvEnd()
-        int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
-                                            vector[u32_t] *psiMsgIndex)
+        # int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
+        #                                     vector[u32_t] *psiMsgIndex)
+        int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize)
+        int getPsiResultsForAll(vector[u32_t] *psiResultsOutput)
 
 #Opef psi receiver
 cdef class OprfPsiReceiver:
     cdef PsiReceiver psi_receiver
     #common_seed:16字节的bytes，双方必须做到统一
     def __init__(self, common_seed: bytes, receiver_size: int, sender_size: int,
-                 matrix_width: int = 128, omp_thread_num: int = 1):
+                 omp_thread_num: int = 1, matrix_width: int = 128):
         if common_seed is None or len(common_seed) < 16:
             raise Exception('oprf psi receiver: param error')
         cdef int ret = self.psi_receiver.init(common_seed, receiver_size, sender_size, matrix_width,
@@ -97,20 +99,33 @@ cdef class OprfPsiReceiver:
             return True
         return False
 
-    def compute_psi_by_hash2_output(self, hash2_from_sender: bytes)-> list:
+    # def compute_psi_by_hash2_output(self, hash2_from_sender: bytes)-> list:
+    #     cdef u64_t recvBufSize = len(hash2_from_sender)
+    #     cdef vector[u32_t] psi_msg_index
+    #     cdef int ret = self.psi_receiver.recvFromSenderAndComputePSIOnce(hash2_from_sender, recvBufSize, &psi_msg_index)
+    #     if ret != 0:
+    #         raise Exception('oprf psi receiver: compute psi by hash2 output from sender error')
+    #     return <list> psi_msg_index
+    def compute_psi_by_hash2_output(self, hash2_from_sender: bytes):
         cdef u64_t recvBufSize = len(hash2_from_sender)
-        cdef vector[u32_t] psi_msg_index
-        cdef int ret = self.psi_receiver.recvFromSenderAndComputePSIOnce(hash2_from_sender, recvBufSize, &psi_msg_index)
+        # cdef vector[u32_t] psi_msg_index
+        cdef int ret = self.psi_receiver.recvFromSenderAndComputePSIOnce(hash2_from_sender, recvBufSize)
         if ret != 0:
             raise Exception('oprf psi receiver: compute psi by hash2 output from sender error')
-        return <list> psi_msg_index
+    #int getPsiResultsForAll(vector[u32_t] *psiResultsOutput)
+    def get_psi_results_for_all(self)-> list:
+        cdef vector[u32_t] psi_results_output
+        cdef int ret = self.psi_receiver.getPsiResultsForAll(&psi_results_output)
+        if ret != 0:
+            raise Exception('oprf psi receiver: get psi results  error')
+        return <list> psi_results_output
 
 #Oprf psi sender
 cdef class OprfPsiSender(object):
     cdef PsiSender psi_sender
     #common_seed:16字节的bytes，双方必须做到统一
-    def __init__(self, common_seed: bytes, sender_size: int, matrix_width: int = 128,
-                 omp_thread_num: int = 1):
+    def __init__(self, common_seed: bytes, sender_size: int, omp_thread_num: int = 1,
+                 matrix_width: int = 128):
         if common_seed is None or len(common_seed) < 16:
             raise Exception('oprf psi sender: param error')
         cdef int ret = self.psi_sender.init(common_seed, sender_size, matrix_width, 20,

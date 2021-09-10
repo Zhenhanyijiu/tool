@@ -8,9 +8,10 @@ import getopt
 
 
 class Sender(object):
-    def __init__(self, common_seed: bytes, sender_size: int, matrix_width: int = 128, omp_thread_num: int = 1):
+    def __init__(self, common_seed: bytes, sender_size: int, omp_thread_num: int = 1,
+                 matrix_width: int = 128):
         self.sender_size = sender_size
-        self.PsiSender = OprfPsiSender(common_seed, sender_size, matrix_width, omp_thread_num)
+        self.PsiSender = OprfPsiSender(common_seed, sender_size, omp_thread_num, matrix_width)
 
     def gen_public_param(self):
         return self.PsiSender.gen_public_param()
@@ -107,13 +108,13 @@ class Client(object):
 
 
 def parse_args(argv):
-    psi_size, sender_size, receiver_size, ip, port = 50, 200, 200, '127.0.0.1', 8888
+    psi_size, sender_size, receiver_size, ip, port, omp_thread_num = 50, 200, 200, '127.0.0.1', 8888, 1
     if len(argv[1:]) == 0:
         print('test.py --rs <500> --ss <500> --ps <100>')
         sys.exit(2)
     try:
         opts, args = getopt.getopt(
-            argv[1:], None, ["rs=", "ss=", "ps=", "ip=", "port=", "help="])
+            argv[1:], None, ["rs=", "ss=", "ps=", "ip=", "port=", "omp=", "help="])
     except getopt.GetoptError:
         print('test.py --rs <500> --ss <500> --ps <100>')
         sys.exit(2)
@@ -131,22 +132,23 @@ def parse_args(argv):
             ip = arg
         if opt in ('--port'):
             port = int(arg)
-    return receiver_size, sender_size, psi_size, ip, port
+        if opt in ('--omp'):
+            omp_thread_num = int(arg)
+    return receiver_size, sender_size, psi_size, ip, port, omp_thread_num
 
 
 def get_use_time(start: int) -> float:
     return (time.time() - start) * 1000
 
 
-def send_pro(receiver_size, sender_size, psi_size, ip, port):
+def send_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num: int = 1):
     client = Client(ip, port)
     sender_set = client.test_gen_data_set(sender_size, psi_size)
-
     # 1. 双方首先协商的公共种子
     # common_seed:16字节的bytes，双方必须做到统一
     common_seed = b'1111111111111112'  # bytearray(b'1111111111111112')
     # 2. 创建接收方对象
-    psi_sender = Sender(common_seed, sender_size, omp_thread_num=4)
+    psi_sender = Sender(common_seed, sender_size, omp_thread_num)
     # 3. 本地生成公共参数public_param
     pub_param, pub_param_byte_size = psi_sender.gen_public_param()
     print("===>", len(pub_param), pub_param, pub_param_byte_size)
@@ -178,11 +180,11 @@ def send_pro(receiver_size, sender_size, psi_size, ip, port):
 
 
 if __name__ == "__main__":
-    receiver_size, sender_size, psi_size, ip, port = parse_args(sys.argv)
+    receiver_size, sender_size, psi_size, ip, port, omp_thread_num = parse_args(sys.argv)
     print('receiver_size, sender_size, psi_size, ip, port=',
-          receiver_size, sender_size, psi_size, ip, port)
-    print("===================")
+          receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
+    print("=========psi sender==========")
     for i in range(1):
-        send_pro(receiver_size, sender_size, psi_size, ip, port)
+        send_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
         print("{}===>>end".format(i))
     # time.sleep(100)
