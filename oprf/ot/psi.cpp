@@ -114,8 +114,8 @@ namespace osuCrypto
     //初始化一个向量r，长度为width
     this->choicesWidthInput.resize(matrixWidth);
     this->choicesWidthInput.randomize(localRng);
-    // this->hashOutputBuff.resize(this->hash2LengthInBytes *
-    // this->bucket2ForComputeH2Output);
+    this->hashOutputBuff.resize(this->hash2LengthInBytes *
+                                this->bucket2ForComputeH2Output);
     this->hashInputs.resize(this->bucket2ForComputeH2Output);
     for (int i = 0; i < this->bucket2ForComputeH2Output; i++)
     {
@@ -575,7 +575,7 @@ namespace osuCrypto
     return 0;
   }
   //计算本方的hash输出并发送给对方
-  int PsiSender::computeHashOutputToReceiverOnce(u8_t *hashOutputBuff, u64_t *sendBuffSize)
+  int PsiSender::computeHashOutputToReceiverOnce(u8_t **sendBuff, u64_t *sendBuffSize)
   {
     auto upR = this->lowL + this->bucket2ForComputeH2Output < this->senderSize
                    ? this->lowL + this->bucket2ForComputeH2Output
@@ -601,10 +601,10 @@ namespace osuCrypto
       H.Reset();
       H.Update(this->hashInputs[j - this->lowL].data(), this->matrixWidthInBytes);
       H.Final(hashOutput);
-      memcpy(hashOutputBuff + offset, hashOutput, this->hash2LengthInBytes);
+      memcpy(this->hashOutputBuff.data() + offset, hashOutput, this->hash2LengthInBytes);
     }
     *sendBuffSize = (upR - this->lowL) * this->hash2LengthInBytes;
-    // *sendBuff = this->hashOutputBuff.data();
+    *sendBuff = this->hashOutputBuff.data();
     this->lowL += this->bucket2ForComputeH2Output;
     return 0;
   }
@@ -1760,7 +1760,7 @@ namespace osuCrypto
     return 0;
   }
   //计算本方的hash输出并发送给对方
-  int PsiSender::computeHashOutputToReceiverOnce(u8_t *hashOutputBuff, u64_t *sendBuffSize)
+  int PsiSender::computeHashOutputToReceiverOnce(u8_t **sendBuff, u64_t *sendBuffSize)
   {
     auto upR = this->lowL + this->bucket2ForComputeH2Output < this->senderSize
                    ? this->lowL + this->bucket2ForComputeH2Output
@@ -1787,10 +1787,10 @@ namespace osuCrypto
       H.Reset();
       H.Update(this->hashInputs[j - this->lowL].data(), this->matrixWidthInBytes);
       H.Final(hashOutput);
-      memcpy(hashOutputBuff + offset, hashOutput, this->hash2LengthInBytes);
+      memcpy(this->hashOutputBuff.data() + offset, hashOutput, this->hash2LengthInBytes);
     }
     *sendBuffSize = (upR - this->lowL) * this->hash2LengthInBytes;
-    // *sendBuff = this->hashOutputBuff.data();
+    *sendBuff = this->hashOutputBuff.data();
     this->lowL += this->bucket2ForComputeH2Output;
     return 0;
   }

@@ -402,8 +402,9 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   printf("===>>recoverMatrixC所需时间:%ldms\n", get_use_time(start3));
   printf("===>>OT所需时间:%ldms\n", get_use_time(start2));
   //循环发送hash输出给对方
-  vector<oc::u8> hashOutputOnceBuff(hash2LengthInBytes * bucket2ForComputeH2Output);
+  // vector<oc::u8> hashOutputOnceBuff(hash2LengthInBytes * bucket2ForComputeH2Output);
   oc::u64 hashOutputOnceBuffSize = 0;
+  oc::u8 *hashOutputOnceBuff = nullptr;
   int totalCyc = senderSize / bucket2ForComputeH2Output;
   int count = 0, countTmp = 10;
   int ret = psiSender.isSendEnd();
@@ -419,14 +420,15 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
     }
     // auto up = low + bucket2ForComputeH2Output < senderSize ? low +
     // bucket2ForComputeH2Output : senderSize;
-    fg = psiSender.computeHashOutputToReceiverOnce(hashOutputOnceBuff.data(),
+
+    fg = psiSender.computeHashOutputToReceiverOnce(&hashOutputOnceBuff,
                                                    &hashOutputOnceBuffSize);
     assert(fg == 0);
     if (count < countTmp)
     {
       printf("count:%d,send:计算一次H2Output所需时间:%ldms\n", count, get_use_time(start00));
     }
-    n = send_data(client, (char *)hashOutputOnceBuff.data(), hashOutputOnceBuffSize);
+    n = send_data(client, (char *)hashOutputOnceBuff, hashOutputOnceBuffSize);
     assert((oc::u64)n == hashOutputOnceBuffSize);
     if (count < countTmp)
     {

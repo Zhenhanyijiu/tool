@@ -66,6 +66,8 @@ class Server(object):
         while True:
             tmp = self.clientsocket.recv(4 - head_len)
             tmp_n = len(tmp)
+            if tmp_n == 0:
+                raise Exception("conn closed")
             head += tmp
             head_len += tmp_n
             if head_len < 4:
@@ -78,6 +80,8 @@ class Server(object):
         while True:
             ret = self.clientsocket.recv(data_len - data_recv)
             ret_len = len(ret)
+            if ret_len == 0:
+                raise Exception("conn closed")
             data += ret
             data_recv += ret_len
             if data_recv < data_len:

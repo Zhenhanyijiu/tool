@@ -26,7 +26,7 @@ cdef extern from "psi.h" namespace "osuCrypto":
         int computeAllHashOutputByH1(const vector[vector[u8_t]] senderSet)
         int recoverMatrixC(const u8_t *recvMatrixADBuff, const u64_t recvMatixADBuffSize)
         int isSendEnd()
-        int computeHashOutputToReceiverOnce(u8_t *sendBuff, u64_t *sendBuffSize)
+        int computeHashOutputToReceiverOnce(u8_t ** sendBuff, u64_t *sendBuffSize)
 
     cdef cppclass PsiReceiver:
         PsiReceiver()except+
@@ -173,13 +173,15 @@ cdef class OprfPsiSender(object):
             return True
         return False
 
-    def compute_hash2_output_to_receiver(self):
-        hash2_output_val = bytes(102400)
-        cdef u8_t *hash2_output_buff = hash2_output_val
+    def compute_hash2_output_to_receiver(self)-> tuple:
+        # hash2_output_val = bytes(102400)
+        # cdef u8_t *hash2_output_buff = hash2_output_val
+        cdef u8_t *hash2_output_buff
         cdef u64_t hash2_output_buff_size
-        cdef int ret = self.psi_sender.computeHashOutputToReceiverOnce(hash2_output_buff, &hash2_output_buff_size)
+        cdef int ret = self.psi_sender.computeHashOutputToReceiverOnce(&hash2_output_buff, &hash2_output_buff_size)
         if ret != 0:
             raise Exception('oprf psi sender: compute hash2 output error')
-        # hash2_output_val = bytes(hash2_output_buff_size)
-        # string.memcpy(<u8_t*> hash2_output_val, hash2_output_buff, hash2_output_buff_size)
-        return hash2_output_buff[:hash2_output_buff_size], hash2_output_buff_size
+        hash2_output_val = bytes(hash2_output_buff_size)
+        string.memcpy(<u8_t*> hash2_output_val, hash2_output_buff, hash2_output_buff_size)
+        # return hash2_output_buff[:hash2_output_buff_size], hash2_output_buff_size
+        return hash2_output_val, hash2_output_buff_size
