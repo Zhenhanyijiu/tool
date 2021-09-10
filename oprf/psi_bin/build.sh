@@ -29,12 +29,15 @@ else
 fi
 #-DENABLE_CIRCUITS=OFF 
 #-DENABLE_MIRACL=ON \
+# NOMP 不并行
+# OMP_ONLY 仅使用omp并行，匹配不用线程池
+# OMP_POOL 使用omp并行且匹配用线程池
 ################C++11##############
 BLAKE2_DIR=../../libOTe/cryptoTools/cryptoTools/Crypto/blake2
 # g++ -g -std=c++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
 g++ -std=gnu++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
 -DENABLE_MIRACL \
--DOMP \
+-DOMP_POOL \
 -I${CRYPTO_INCLUDE} -I${THIRD_INCLUDE}/miracl \
 -I${THIRD_INCLUDE}/miracl/miracl/include \
 -I${BLAKE2_DIR} \

@@ -285,7 +285,7 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
     {
       printf("count:%d,recv:接收一次H2Ouput所需时间:%ldms\n", count, get_use_time(start00));
     }
-#ifdef OMP_ONLY
+#if (defined NOMP) || (defined OMP_ONLY)
     vector<oc::u32> psiMsgIndexsTmp;
     fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput, n, &psiMsgIndexsTmp);
     assert(fg == 0);
@@ -296,7 +296,8 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
     }
     psiMsgIndexs.insert(psiMsgIndexs.end(), psiMsgIndexsTmp.begin(), psiMsgIndexsTmp.end());
     count++;
-#else
+#endif
+#ifdef OMP_POOL
     fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput, n);
     assert(fg == 0);
     if (count < countTmp)
@@ -306,8 +307,7 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
     count++;
 #endif
   }
-#ifdef OMP_ONLY
-#else
+#ifdef OMP_POOL
   fg = psiRecv.getPsiResultsForAll(&psiMsgIndexs);
   printf("============>>getPsiResultsForAll fg:%d\n", fg);
   assert(fg == 0);

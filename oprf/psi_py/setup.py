@@ -61,10 +61,11 @@ def start_setup():
     include_dirs.append(THIRD_INCLUDE + "/miracl")
     include_dirs.append(THIRD_INCLUDE + "/miracl/miracl/include")
     # 宏定义
-    define_macros = [('ENABLE_MIRACL', None), ('OMP', None), ('NDEBUG', None)]
+    define_macros = [('ENABLE_MIRACL', None), ('OMP_POOL', None), ('NDEBUG', None)]
     # 其他编译条件，-std=gnu++11,-std=c++11
     extra_compile_args = ['-std=c++11', '-Wall', '-O2', '-fopenmp',
                           '-msse3', '-msse2', '-msse4.1', '-maes', '-mpclmul']
+    # 链接omp
     extra_link_args = ['-lgomp']
     # 依赖库路径，-L
     library_dirs = [THIRD_INCLUDE + "/miracl/miracl/source/"]

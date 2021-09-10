@@ -133,14 +133,13 @@ namespace osuCrypto
                                             u64 low, u64 up, vector<int> &psiMsgIndex)
         }
         */
-#ifdef OMP_ONLY
+#if (defined NOMP) || (defined OMP_ONLY)
         int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
                                             vector<u32_t> *psiMsgIndex);
-#else
+#endif
+#ifdef OMP_POOL
         int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize);
         int getPsiResultsForAll(vector<u32_t> *psiResultsOutput);
 #endif
     };
-    // void generateDataSetDebug(const int ptype, const u64_t dataSize, const u64_t psiSize,
-    //                           u64_t seed, u64_t ids, vector<vector<u8_t>> *dataSet);
 }

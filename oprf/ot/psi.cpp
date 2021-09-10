@@ -610,7 +610,7 @@ namespace osuCrypto
   }
 #endif
 //并行逻辑
-#ifdef OMP
+#if (defined OMP_ONLY) || (defined OMP_POOL)
   //多线程处理，计算Hash1
   typedef struct HashOneInfo
   {
@@ -1207,7 +1207,7 @@ namespace osuCrypto
     }
     return 0;
   }
-/********************
+  /********************
   //并行处理 匹配逻辑,采用在外部进行omp指令，性能比在外部还要慢5倍以上
   typedef struct ComputePsiInfo
   {
@@ -1320,152 +1320,6 @@ namespace osuCrypto
 
 *******************/
 
-// PsiReceiver,接收对方发来的hash输出
-#ifdef OMP_ONLY
-  int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8_t *recvBuff,
-                                                   const u64_t recvBufSize,
-                                                   vector<u32_t> *psiMsgIndex)
-  {
-    auto up = this->lowL + this->bucket2ForComputeH2Output < this->senderSize
-                  ? this->lowL + this->bucket2ForComputeH2Output
-                  : this->senderSize;
-    if (recvBufSize != (up - this->lowL) * this->hash2LengthInBytes)
-    {
-      return -122;
-    }
-    //
-    u64 offset = 0;
-    for (auto idx = 0; idx < up - this->lowL; ++idx, offset += this->hash2LengthInBytes)
-    {
-      u64 mapIdx = *(u64 *)(recvBuff + offset);
-      // #pragma omp parallel for num_threads(this->threadNumOmp)
-      //这里加omp指令并不能提高性能，反而下降一倍多
-      for (int i = 0; i < this->HashMapVector.size(); i++)
-      {
-        auto found = this->HashMapVector[i].find(mapIdx);
-        if (found == this->HashMapVector[i].end())
-          continue;
-        //可能找到好几个
-        for (auto j = 0; j < found->second.size(); ++j)
-        {
-          if (memcmp(&(found->second[j].first), recvBuff + offset,
-                     this->hash2LengthInBytes) == 0)
-          {
-            // psiMsgIndex->push_back(found->second[j].second);
-            psiMsgIndex->emplace_back(found->second[j].second);
-            break;
-          }
-        }
-      }
-    }
-    this->lowL += this->bucket2ForComputeH2Output;
-    return 0;
-  }
-#else
-  //匹配用线程池
-  typedef struct ThreadPoolInfo
-  {
-    u8_t *recvBuff;
-    u64_t recvBufSize;
-    u64_t hash2LengthInBytes;
-    u64_t lowL;
-    u64_t up;
-    unordered_map<u64, std::vector<std::pair<block, u32_t>>> *HashMapVectorPtr;
-    int hashMapSize;
-    u32_t psiResultId;
-    vector<u32_t> *psiResult;
-  } ThreadPoolInfo;
-  // typedef ThreadPoolInfo *ThreadPoolInfoPtr;
-  // 任务function
-  u32_t process_compute_psi_by_threadpool(ThreadPoolInfo *infoArg)
-  {
-    u64_t recvBufSize = infoArg->recvBufSize;
-    // printf("------------------->>>>psiResultId:%d\n", psiResultId);
-    // vector<u32_t> *psiResult = infoArg->psiResult;
-    u64 offset = 0;
-    for (auto idx = 0; idx < infoArg->up - infoArg->lowL; ++idx,
-              offset += infoArg->hash2LengthInBytes)
-    {
-      u64 mapIdx = *(u64 *)(infoArg->recvBuff + offset);
-      //这里加omp指令并不能提高性能，反而下降一倍多
-      for (int i = 0; i < infoArg->hashMapSize; i++)
-      {
-        auto found = infoArg->HashMapVectorPtr[i].find(mapIdx);
-        if (found == infoArg->HashMapVectorPtr[i].end())
-          continue;
-        //可能找到好几个
-        for (auto j = 0; j < found->second.size(); ++j)
-        {
-          if (memcmp(&(found->second[j].first), infoArg->recvBuff + offset,
-                     infoArg->hash2LengthInBytes) == 0)
-          {
-            // psiMsgIndex->push_back(found->second[j].second);
-            infoArg->psiResult[0].emplace_back(found->second[j].second);
-            // printf("###psiResultId:%d\n", psiResultId);
-            break;
-          }
-        }
-      }
-    }
-    u32_t psiResultId = infoArg->psiResultId;
-    //free内存
-    free(infoArg->recvBuff);
-    infoArg->recvBuff = nullptr;
-    free(infoArg);
-    infoArg = nullptr;
-    return psiResultId;
-  }
-  int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8_t *recvBuff,
-                                                   const u64_t recvBufSize)
-  {
-    auto up = this->lowL + this->bucket2ForComputeH2Output < this->senderSize
-                  ? this->lowL + this->bucket2ForComputeH2Output
-                  : this->senderSize;
-    if (recvBufSize != (up - this->lowL) * this->hash2LengthInBytes)
-    {
-      return -122;
-    }
-    ThreadPoolInfo *infoArg = (ThreadPoolInfo *)malloc(sizeof(ThreadPoolInfo));
-    memset(infoArg, 0, sizeof(ThreadPoolInfo));
-    //赋值
-    infoArg->recvBuff = (u8_t *)malloc(recvBufSize);
-    if (infoArg->recvBuff == nullptr)
-    {
-      return -123;
-    }
-    memcpy(infoArg->recvBuff, recvBuff, recvBufSize);
-    infoArg->recvBufSize = recvBufSize;
-    infoArg->hash2LengthInBytes = this->hash2LengthInBytes;
-    infoArg->lowL = this->lowL;
-    infoArg->up = up;
-    infoArg->HashMapVectorPtr = this->HashMapVector.data();
-    infoArg->hashMapSize = this->HashMapVector.size();
-    infoArg->psiResultId = this->indexId;
-    infoArg->psiResult = (vector<u32_t> *)(this->psiResults.data()) + this->indexId;
-    //赋值end
-    this->psiResultsIndex.emplace_back(this->psiComputePool->enqueue(
-        process_compute_psi_by_threadpool, infoArg));
-    this->lowL += this->bucket2ForComputeH2Output;
-    this->indexId++;
-    return 0;
-  }
-  //最后获取psi结果
-  int PsiReceiver::getPsiResultsForAll(vector<u32_t> *psiResultsOutput)
-  {
-    u64_t psiResultsSize = this->psiResultsIndex.size();
-    printf("===>>psiResultsIndex size:%ld\n", psiResultsSize);
-    for (u64_t i = 0; i < psiResultsSize; i++)
-    {
-      u32_t resultIndex = (this->psiResultsIndex)[i].get();
-      // printf("===>>ind:%ld,resultIndex:%d\n", i, resultIndex);
-      for (int j = 0; j < this->psiResults[resultIndex].size(); j++)
-      {
-        (*psiResultsOutput).emplace_back(this->psiResults[resultIndex][j]);
-      }
-    }
-    return 0;
-  }
-#endif
   //*******************psi-sender*****************//
   //计算所有id的hash1值，备用
   int PsiSender::computeAllHashOutputByH1(const vector<vector<u8_t>> senderSet)
@@ -1792,6 +1646,156 @@ namespace osuCrypto
     *sendBuffSize = (upR - this->lowL) * this->hash2LengthInBytes;
     *sendBuff = this->hashOutputBuff.data();
     this->lowL += this->bucket2ForComputeH2Output;
+    return 0;
+  }
+#endif
+
+// PsiReceiver,接收对方发来的hash输出
+#ifdef OMP_ONLY
+  //匹配不使用线程池
+  int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8_t *recvBuff,
+                                                   const u64_t recvBufSize,
+                                                   vector<u32_t> *psiMsgIndex)
+  {
+    auto up = this->lowL + this->bucket2ForComputeH2Output < this->senderSize
+                  ? this->lowL + this->bucket2ForComputeH2Output
+                  : this->senderSize;
+    if (recvBufSize != (up - this->lowL) * this->hash2LengthInBytes)
+    {
+      return -122;
+    }
+    //
+    u64 offset = 0;
+    for (auto idx = 0; idx < up - this->lowL; ++idx, offset += this->hash2LengthInBytes)
+    {
+      u64 mapIdx = *(u64 *)(recvBuff + offset);
+      // #pragma omp parallel for num_threads(this->threadNumOmp)
+      //这里加omp指令并不能提高性能，反而下降一倍多
+      for (int i = 0; i < this->HashMapVector.size(); i++)
+      {
+        auto found = this->HashMapVector[i].find(mapIdx);
+        if (found == this->HashMapVector[i].end())
+          continue;
+        //可能找到好几个
+        for (auto j = 0; j < found->second.size(); ++j)
+        {
+          if (memcmp(&(found->second[j].first), recvBuff + offset,
+                     this->hash2LengthInBytes) == 0)
+          {
+            // psiMsgIndex->push_back(found->second[j].second);
+            psiMsgIndex->emplace_back(found->second[j].second);
+            break;
+          }
+        }
+      }
+    }
+    this->lowL += this->bucket2ForComputeH2Output;
+    return 0;
+  }
+#endif
+
+#ifdef OMP_POOL
+  //匹配用线程池
+  typedef struct ThreadPoolInfo
+  {
+    u8_t *recvBuff;
+    u64_t recvBufSize;
+    u64_t hash2LengthInBytes;
+    u64_t lowL;
+    u64_t up;
+    unordered_map<u64, std::vector<std::pair<block, u32_t>>> *HashMapVectorPtr;
+    int hashMapSize;
+    u32_t psiResultId;
+    vector<u32_t> *psiResult;
+  } ThreadPoolInfo;
+  // typedef ThreadPoolInfo *ThreadPoolInfoPtr;
+  // 任务function
+  u32_t process_compute_psi_by_threadpool(ThreadPoolInfo *infoArg)
+  {
+    u64_t recvBufSize = infoArg->recvBufSize;
+    // printf("------------------->>>>psiResultId:%d\n", psiResultId);
+    // vector<u32_t> *psiResult = infoArg->psiResult;
+    u64 offset = 0;
+    for (auto idx = 0; idx < infoArg->up - infoArg->lowL; ++idx,
+              offset += infoArg->hash2LengthInBytes)
+    {
+      u64 mapIdx = *(u64 *)(infoArg->recvBuff + offset);
+      //这里加omp指令并不能提高性能，反而下降一倍多
+      for (int i = 0; i < infoArg->hashMapSize; i++)
+      {
+        auto found = infoArg->HashMapVectorPtr[i].find(mapIdx);
+        if (found == infoArg->HashMapVectorPtr[i].end())
+          continue;
+        //可能找到好几个
+        for (auto j = 0; j < found->second.size(); ++j)
+        {
+          if (memcmp(&(found->second[j].first), infoArg->recvBuff + offset,
+                     infoArg->hash2LengthInBytes) == 0)
+          {
+            // psiMsgIndex->push_back(found->second[j].second);
+            infoArg->psiResult[0].emplace_back(found->second[j].second);
+            // printf("###psiResultId:%d\n", psiResultId);
+            break;
+          }
+        }
+      }
+    }
+    u32_t psiResultId = infoArg->psiResultId;
+    //free内存
+    free(infoArg->recvBuff);
+    infoArg->recvBuff = nullptr;
+    free(infoArg);
+    infoArg = nullptr;
+    return psiResultId;
+  }
+  int PsiReceiver::recvFromSenderAndComputePSIOnce(const u8_t *recvBuff,
+                                                   const u64_t recvBufSize)
+  {
+    auto up = this->lowL + this->bucket2ForComputeH2Output < this->senderSize
+                  ? this->lowL + this->bucket2ForComputeH2Output
+                  : this->senderSize;
+    if (recvBufSize != (up - this->lowL) * this->hash2LengthInBytes)
+    {
+      return -122;
+    }
+    ThreadPoolInfo *infoArg = (ThreadPoolInfo *)malloc(sizeof(ThreadPoolInfo));
+    memset(infoArg, 0, sizeof(ThreadPoolInfo));
+    //赋值
+    infoArg->recvBuff = (u8_t *)malloc(recvBufSize);
+    if (infoArg->recvBuff == nullptr)
+    {
+      return -123;
+    }
+    memcpy(infoArg->recvBuff, recvBuff, recvBufSize);
+    infoArg->recvBufSize = recvBufSize;
+    infoArg->hash2LengthInBytes = this->hash2LengthInBytes;
+    infoArg->lowL = this->lowL;
+    infoArg->up = up;
+    infoArg->HashMapVectorPtr = this->HashMapVector.data();
+    infoArg->hashMapSize = this->HashMapVector.size();
+    infoArg->psiResultId = this->indexId;
+    infoArg->psiResult = (vector<u32_t> *)(this->psiResults.data()) + this->indexId;
+    //赋值end
+    this->psiResultsIndex.emplace_back(this->psiComputePool->enqueue(
+        process_compute_psi_by_threadpool, infoArg));
+    this->lowL += this->bucket2ForComputeH2Output;
+    this->indexId++;
+    return 0;
+  }
+  //最后获取psi结果
+  int PsiReceiver::getPsiResultsForAll(vector<u32_t> *psiResultsOutput)
+  {
+    u64_t psiResultsSize = this->psiResultsIndex.size();
+    printf("===>>psiResultsIndex size:%ld\n", psiResultsSize);
+    for (u64_t i = 0; i < psiResultsSize; i++)
+    {
+      u32_t resultIndex = (this->psiResultsIndex)[i].get();
+      // printf("===>>ind:%ld,resultIndex:%d\n", i, resultIndex);
+      for (int j = 0; j < this->psiResults[resultIndex].size(); j++)
+      {
+        (*psiResultsOutput).emplace_back(this->psiResults[resultIndex][j]);
+      }
+    }
     return 0;
   }
 #endif
