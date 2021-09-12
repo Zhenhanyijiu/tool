@@ -446,6 +446,7 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   // sleep(20);
   // assert(1 == 3);
 }
+#if NOSOCKET
 int main(int argc, char **argv)
 {
   // int ptype = atoi(argv[1]); //0 send;1 recv
@@ -561,4 +562,10 @@ int main(int argc, char **argv)
   // sleep(1000);
   return 0;
 }
+#else
+int main()
+{
+}
+#endif
+
 #endif

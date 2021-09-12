@@ -1799,4 +1799,137 @@ namespace osuCrypto
     return 0;
   }
 #endif
+//集成socket的oprf-psi
+#ifdef OMP_POOL
+  int oprf_psi_receiver_process(u64_t receiverSize, u64_t senderSize, string address,
+                                int port, u8_t *commonSeed, u64_t matrixWidth,
+                                u64_t logHeight, u64_t hash2LengthInBytes,
+                                u64_t bucket2ForComputeH2Output, int omp_num,
+                                vector<vector<u8_t>> receiver_set, vector<u32_t> *psiResultsOutput)
+  {
+    //生成recvSet
+    // long start0 = start_time();
+    oc::PsiReceiver psiRecv;
+    //初始化一个socket连接
+    void *server = initChannel(SERVER, address.c_str(), port);
+    if (server == nullptr)
+    {
+      return -11;
+    }
+    long start1 = start_time();
+    //初始化psiRecv
+    int fg = psiRecv.init(commonSeed, receiverSize, senderSize, matrixWidth, logHeight,
+                          omp_num, hash2LengthInBytes, bucket2ForComputeH2Output);
+    if (fg)
+    {
+      return fg;
+    }
+    // assert(fg == 0);
+    //接收对方的公共参数,并生成 pk0sBuf
+    char *pubParamBuf = nullptr;
+    char *pk0sBuf = nullptr;
+    oc::u64 pk0sBufSize = 0;
+    int n = recv_data(server, &pubParamBuf);
+    if (n <= 0)
+    {
+      return -12;
+    }
+
+    fg = psiRecv.genPK0FromNpot((oc::u8 *)pubParamBuf, n, (oc::u8 **)&pk0sBuf, &pk0sBufSize);
+    if (fg)
+    {
+      return fg;
+    }
+
+    n = send_data(server, pk0sBuf, pk0sBufSize);
+    //接收 uBuffInput,并生成matrixAD,并发送给对方
+    char *uBuffInput = nullptr;
+    char *matrixADBuff = nullptr;
+    oc::u64 matrixADBuffSize = 0;
+    n = recv_data(server, &uBuffInput);
+    if (n <= 0)
+    {
+      return -12;
+    }
+    // assert(n > 0);
+    long start2 = start_time();
+    fg = psiRecv.getSendMatrixADBuff((oc::u8 *)uBuffInput, n, receiver_set,
+                                     (oc::u8 **)&matrixADBuff, &matrixADBuffSize);
+    n = send_data(server, matrixADBuff, matrixADBuffSize);
+    printf("===>>recv:生成MatrixAD所需时间:%ld ms\n", get_use_time(start2));
+    printf("===>>recv:OT所需时间:%ld ms\n", get_use_time(start1));
+    //本方生成hashMap
+    long start3 = start_time();
+    fg = psiRecv.genenateAllHashesMap();
+    if (fg)
+    {
+      return fg;
+    }
+    printf("===>>recv:生成hashMap表所需时间:%ld ms\n", get_use_time(start3));
+    //循环接收对方发来的hashOutput
+    long start4 = start_time();
+    // char *hashOutput = nullptr;
+    // vector<oc::u32> psiMsgIndexs;
+    int totalCyc = senderSize / bucket2ForComputeH2Output;
+    printf("===>>sendersize:%ld,bucket2ForComputeH2Output:%d,totalCyc:%d\n",
+           senderSize, bucket2ForComputeH2Output, totalCyc);
+    int count = 0, countTmp = 10;
+    long int start00;
+    for (; psiRecv.isRecvEnd() == 0;)
+    {
+      char *hashOutput = nullptr;
+      if (count < countTmp)
+      {
+        start00 = start_time();
+      }
+      n = recv_data(server, &hashOutput);
+      if (n <= 0)
+      {
+        printf("===>>(recv_data error)count:%d\n", count);
+      }
+      assert(n > 0);
+      if (count < countTmp)
+      {
+        printf("count:%d,recv:接收一次H2Ouput所需时间:%ldms\n", count, get_use_time(start00));
+      }
+      fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput, n);
+      if (fg)
+      {
+        return fg;
+      }
+      if (count < countTmp)
+      {
+        printf("count:%d,pool recv:接收一次H2Ouput并匹配所需时间:%ldms\n", count, get_use_time(start00));
+      }
+      count++;
+    }
+    //获取psi结果
+    fg = psiRecv.getPsiResultsForAll(psiResultsOutput);
+    printf("===>>getPsiResultsForAll end fg:%d\n", fg);
+    if (fg)
+    {
+      return fg;
+    }
+    printf("===>>count:%d\n", count);
+    printf("===>>recv: 匹配find用时：%ldms,totalCyc:%d,count:%d\n",
+           get_use_time(start4), totalCyc, count);
+    printf("===>>recv:总用时：%ldms\n", get_use_time(start1));
+    printf("===>>psi count:%ld,最后索引:%d\n", psiResultsOutput.size(),
+           psiResultsOutput[psiResultsOutput.size() - 1]);
+    assert(psiResultsOutput.size() == Psi_Size);
+    //释放mem
+    releaseChannel(server);
+    printf("===>>oprf psi receiver end...\n");
+    return 0;
+  }
+  //psi sender
+  int oprf_psi_sender_process(u64_t receiverSize, u64_t senderSize, string address,
+                              int port, u8_t *commonSeed, u64_t matrixWidth,
+                              u64_t logHeight, u64_t hash2LengthInBytes,
+                              u64_t bucket2ForComputeH2Output, int omp_num,
+                              vector<vector<u8_t>> sender_set)
+  {
+    return 0;
+  }
+#endif
 } // namespace osuCrypto

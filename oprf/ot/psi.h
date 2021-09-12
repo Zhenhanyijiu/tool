@@ -142,4 +142,17 @@ namespace osuCrypto
         int getPsiResultsForAll(vector<u32_t> *psiResultsOutput);
 #endif
     };
+    //集成socket的oprf-psi
+#ifdef OMP_POOL
+    int oprf_psi_receiver_process(u64_t receiverSize, u64_t senderSize, string address,
+                                  int port, u8_t *commonSeed, u64_t matrixWidth,
+                                  u64_t logHeight, u64_t hash2LengthInBytes,
+                                  u64_t bucket2ForComputeH2Output, int omp_num,
+                                  vector<vector<u8_t>> receiver_set, vector<u32_t> *psiResultsOutput);
+    int oprf_psi_sender_process(u64_t receiverSize, u64_t senderSize, string address,
+                                int port, u8_t *commonSeed, u64_t matrixWidth,
+                                u64_t logHeight, u64_t hash2LengthInBytes,
+                                u64_t bucket2ForComputeH2Output, int omp_num,
+                                vector<vector<u8_t>> sender_set);
+#endif
 }

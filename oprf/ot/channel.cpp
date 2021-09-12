@@ -281,8 +281,8 @@ int send_data(void *channel, const char *buff, int buf_size)
         }
     }
     // n = send(chan->conn, buff, buf_size, 0);
-    assert(n == buf_size);
-    return n;
+    // assert(n == buf_size);
+    return buf_size;
 }
 int recv_data(void *channel, char **buff_output)
 {
