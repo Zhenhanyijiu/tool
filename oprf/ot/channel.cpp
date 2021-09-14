@@ -85,7 +85,6 @@ void *initChannel(PartType pltype, const char *address, int port)
             printf("创建socket失败！\n");
             return nullptr;
         }
-
         stRemoteAddr.sin_family = AF_INET;
         stRemoteAddr.sin_port = htons(port);
         // inet_pton(AF_INET, ADDR, &iRemoteAddr);
@@ -93,7 +92,7 @@ void *initChannel(PartType pltype, const char *address, int port)
         stRemoteAddr.sin_addr.s_addr = inet_addr(address);
 
         //连接方法： 传入句柄，目标地址，和大小
-        Timeout *t = new_timiout(300);
+        Timeout *t = new_timiout(600);
         while (1)
         {
             int fg = connect(socket_fd, (struct sockaddr *)&stRemoteAddr, sizeof(stRemoteAddr));

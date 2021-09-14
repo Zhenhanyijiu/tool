@@ -446,7 +446,7 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   // sleep(20);
   // assert(1 == 3);
 }
-#if NOSOCKET
+#if NOSOCKET_TEST
 int main(int argc, char **argv)
 {
   // int ptype = atoi(argv[1]); //0 send;1 recv
@@ -562,10 +562,145 @@ int main(int argc, char **argv)
   // sleep(1000);
   return 0;
 }
-#else
-int main()
+#endif //NOSOCKET_TEST
+#ifdef SOCKET_TEST
+int main(int argc, char **argv)
 {
+  // int ptype = atoi(argv[1]); //0 send;1 recv
+  printf(" ======= SOCKET_TEST =======\n");
+  oc::CLP cmd;
+  cmd.parse(argc, argv);
+  cmd.setDefault("w", 60);
+  oc::u64 matrixWidth = cmd.get<oc::u64>("w");
+  printf("===>>矩阵宽度w:%ld\n", matrixWidth);
+  cmd.setDefault("h", 10);
+  oc::u64 logHeight = cmd.get<oc::u64>("h");
+  printf("===>>矩阵高度取对数logH:%ld\n", logHeight);
+  cmd.setDefault("ss", 5000000);
+  oc::u64 senderSize = cmd.get<oc::u64>("ss");
+  printf("===>>接收方集合大小ss:%ld\n", senderSize);
+  cmd.setDefault("rs", 5000000);
+  oc::u64 receiverSize = cmd.get<oc::u64>("rs");
+  printf("===>>发送方集合大小rs:%ld\n", receiverSize);
+  //数据id的长度
+  cmd.setDefault("ids", 18);
+  oc::u64 ids = cmd.get<oc::u64>("ids");
+  printf("===>>每个id的字节长度ids:%ld,length of id\n", ids);
+  //命令行传种子
+  cmd.setDefault("sd", 0);
+  seed = cmd.get<oc::u64>("sd");
+  printf("===>>公共种子用于测试sd:%ld\n", seed);
+  //交集个数
+  cmd.setDefault("ps", 2000000);
+  // cmd.setDefault("ps", 20000);
+  Psi_Size = cmd.get<oc::u64>("ps");
+  printf("===>>双方交集个数用于测试，ps:%ld\n", Psi_Size);
+  //数据文件路径
+  cmd.setDefault("in", "");
+  string inFile = cmd.get<string>("in");
+  printf("===>>输入文件路径in:%s,input file\n", inFile.c_str());
+  //保存数据文件路径
+  cmd.setDefault("out", "");
+  string outFile = cmd.get<string>("out");
+  printf("===>>输出文件路径out:%s,output file\n", outFile.c_str());
+  // int hash2LengthInBytes = atoi(argv[6]);
+  int hash2LengthInBytes = 10;
+  // int bucket2ForComputeH2Output = atoi(argv[7]);
+  int bucket2ForComputeH2Output = 256;
+  bucket2ForComputeH2Output = 512;
+  bucket2ForComputeH2Output = 10240;
+  // ip地址
+  cmd.setDefault("ip", "127.0.0.1");
+  string address = cmd.get<string>("ip");
+  printf("===>>ip地址ip:%s\n", address.c_str());
+  // port端口
+  cmd.setDefault("port", 7878);
+  int port = cmd.get<oc::u64>("port");
+  printf("===>>端口port:%d\n", port);
+  // omp num
+  cmd.setDefault("omp", 1);
+  int omp_num = cmd.get<oc::u64>("omp");
+  printf("===>>线程数omp_num:%d\n", omp_num);
+  if (!cmd.isSet("r"))
+  {
+    std::cout << "=================================\n"
+              << "||  Private Set Intersection   ||\n"
+              << "=================================\n"
+              << "\n"
+              << "This program reports the performance of the private set "
+                 "intersection protocol.\n"
+              << "\n"
+              << "Experimenet flag:\n"
+              << " -r 0    to run a sender.\n"
+              << " -r 1    to run a receiver.\n"
+              << "\n"
+              << "Parameters:\n"
+              << " -ss     the size of dataset on sender side.\n"
+              << " -rs     the size of dataset on receiver side.\n"
+              << " -ids    the size of an ID for bytes.\n"
+              << " -w      width of the matrix.\n"
+              << " -h      log(height) of the matrix.\n"
+              << " -sd     common seed (optional) for sender and receiver.\n"
+              << " -in     the input file path .\n"
+              << " -out    the output file path saving psi-set.\n"
+              << " -ip     ip address .\n"
+              << " -port   port.\n";
+    return 0;
+  }
+  int ptype = cmd.get<oc::u64>("r");
+  printf("===>>类型（发送方或者接收方）r:%d\n", ptype);
+  // oc::block commonSeed = oc::toBlock(0x333333 + seed);
+  oc::u64 comSeed = 0x333333 + seed;
+  oc::u8_t commonSeed[16];
+  memset(commonSeed, 0, 16);
+  memcpy(commonSeed, (oc::u8_t *)&comSeed, 8);
+
+  //test
+  for (int i = 0; i < 1; i++)
+  {
+    long start0 = start_time();
+    if (ptype == CLIENT)
+    {
+      //生成sendSet
+      long start0 = start_time();
+      vector<vector<oc::u8_t>> sendSet;
+
+      generateDataSet(0, senderSize, seed, ids, sendSet);
+
+      printf("===>>sender:生成发送者数据集:%ldms\n", get_use_time(start0));
+
+      int fg = oc::oprf_psi_sender_process(receiverSize, senderSize, address.c_str(),
+                                           port, commonSeed, matrixWidth,
+                                           logHeight, hash2LengthInBytes,
+                                           bucket2ForComputeH2Output, omp_num,
+                                           sendSet);
+      assert(fg == 0);
+    }
+    if (ptype == SERVER) // recv
+    {
+      //生成recvSet
+      long start0 = start_time();
+      vector<vector<oc::u8_t>> recvSet;
+      generateDataSet(1, receiverSize, seed, ids, recvSet);
+      printf("===>>recv:生成接收者数据集:%ldms\n", get_use_time(start0));
+      vector<oc::u32_t> psiResultsOutput;
+      int fg = oc::oprf_psi_receiver_process(receiverSize, senderSize, address.c_str(),
+                                             port, commonSeed, matrixWidth,
+                                             logHeight, hash2LengthInBytes,
+                                             bucket2ForComputeH2Output, omp_num,
+                                             recvSet, &psiResultsOutput);
+      assert(fg == 0);
+      printf("===>>psi count:%ld,最后索引:%d\n", psiResultsOutput.size(),
+             psiResultsOutput[psiResultsOutput.size() - 1]);
+      assert(psiResultsOutput.size() == Psi_Size);
+    }
+    printf("===>>(%d)测试用时：%ld ms,sizeof(long):%ld\n", i, get_use_time(start0), sizeof(long));
+    int sl = 30;
+    // sleep(sl);
+    // printf("==============>>i(%d)睡眠了%d s，开始下一次测试\n", i, sl);
+  }
+  return 0;
 }
-#endif
+#endif //SOCKET_TEST
 
 #endif

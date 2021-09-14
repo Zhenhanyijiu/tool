@@ -8,6 +8,7 @@
 #include <string.h>
 #include <cstdint>
 #include <stdlib.h>
+#include <channel.h>
 namespace osuCrypto
 {
   //时间统计ms
@@ -1799,19 +1800,20 @@ namespace osuCrypto
     return 0;
   }
 #endif
-//集成socket的oprf-psi
+//集成socket的oprf-psi接口，单独提供出来
 #ifdef OMP_POOL
-  int oprf_psi_receiver_process(u64_t receiverSize, u64_t senderSize, string address,
+  int oprf_psi_receiver_process(u64_t receiverSize, u64_t senderSize, const char *address,
                                 int port, u8_t *commonSeed, u64_t matrixWidth,
                                 u64_t logHeight, u64_t hash2LengthInBytes,
                                 u64_t bucket2ForComputeH2Output, int omp_num,
-                                vector<vector<u8_t>> receiver_set, vector<u32_t> *psiResultsOutput)
+                                vector<vector<u8_t>> receiver_set,
+                                vector<u32_t> *psiResultsOutput)
   {
     //生成recvSet
     // long start0 = start_time();
-    oc::PsiReceiver psiRecv;
+    PsiReceiver psiRecv;
     //初始化一个socket连接
-    void *server = initChannel(SERVER, address.c_str(), port);
+    void *server = initChannel(SERVER, address, port);
     if (server == nullptr)
     {
       return -11;
@@ -1828,14 +1830,14 @@ namespace osuCrypto
     //接收对方的公共参数,并生成 pk0sBuf
     char *pubParamBuf = nullptr;
     char *pk0sBuf = nullptr;
-    oc::u64 pk0sBufSize = 0;
+    u64 pk0sBufSize = 0;
     int n = recv_data(server, &pubParamBuf);
     if (n <= 0)
     {
       return -12;
     }
 
-    fg = psiRecv.genPK0FromNpot((oc::u8 *)pubParamBuf, n, (oc::u8 **)&pk0sBuf, &pk0sBufSize);
+    fg = psiRecv.genPK0FromNpot((u8 *)pubParamBuf, n, (u8 **)&pk0sBuf, &pk0sBufSize);
     if (fg)
     {
       return fg;
@@ -1845,7 +1847,7 @@ namespace osuCrypto
     //接收 uBuffInput,并生成matrixAD,并发送给对方
     char *uBuffInput = nullptr;
     char *matrixADBuff = nullptr;
-    oc::u64 matrixADBuffSize = 0;
+    u64 matrixADBuffSize = 0;
     n = recv_data(server, &uBuffInput);
     if (n <= 0)
     {
@@ -1853,8 +1855,8 @@ namespace osuCrypto
     }
     // assert(n > 0);
     long start2 = start_time();
-    fg = psiRecv.getSendMatrixADBuff((oc::u8 *)uBuffInput, n, receiver_set,
-                                     (oc::u8 **)&matrixADBuff, &matrixADBuffSize);
+    fg = psiRecv.getSendMatrixADBuff((u8 *)uBuffInput, n, receiver_set,
+                                     (u8 **)&matrixADBuff, &matrixADBuffSize);
     n = send_data(server, matrixADBuff, matrixADBuffSize);
     printf("===>>recv:生成MatrixAD所需时间:%ld ms\n", get_use_time(start2));
     printf("===>>recv:OT所需时间:%ld ms\n", get_use_time(start1));
@@ -1878,29 +1880,34 @@ namespace osuCrypto
     for (; psiRecv.isRecvEnd() == 0;)
     {
       char *hashOutput = nullptr;
+#ifdef SOCKET_TEST
       if (count < countTmp)
       {
         start00 = start_time();
       }
+#endif
       n = recv_data(server, &hashOutput);
       if (n <= 0)
       {
         printf("===>>(recv_data error)count:%d\n", count);
       }
-      assert(n > 0);
+#ifdef SOCKET_TEST
       if (count < countTmp)
       {
         printf("count:%d,recv:接收一次H2Ouput所需时间:%ldms\n", count, get_use_time(start00));
       }
-      fg = psiRecv.recvFromSenderAndComputePSIOnce((oc::u8 *)hashOutput, n);
+#endif
+      fg = psiRecv.recvFromSenderAndComputePSIOnce((u8 *)hashOutput, n);
       if (fg)
       {
         return fg;
       }
+#ifdef SOCKET_TEST
       if (count < countTmp)
       {
         printf("count:%d,pool recv:接收一次H2Ouput并匹配所需时间:%ldms\n", count, get_use_time(start00));
       }
+#endif
       count++;
     }
     //获取psi结果
@@ -1914,21 +1921,143 @@ namespace osuCrypto
     printf("===>>recv: 匹配find用时：%ldms,totalCyc:%d,count:%d\n",
            get_use_time(start4), totalCyc, count);
     printf("===>>recv:总用时：%ldms\n", get_use_time(start1));
-    printf("===>>psi count:%ld,最后索引:%d\n", psiResultsOutput.size(),
-           psiResultsOutput[psiResultsOutput.size() - 1]);
-    assert(psiResultsOutput.size() == Psi_Size);
+
     //释放mem
     releaseChannel(server);
     printf("===>>oprf psi receiver end...\n");
     return 0;
   }
-  //psi sender
-  int oprf_psi_sender_process(u64_t receiverSize, u64_t senderSize, string address,
+  //psi sender方，接口单独提供出来
+  int oprf_psi_sender_process(u64_t receiverSize, u64_t senderSize, const char *address,
                               int port, u8_t *commonSeed, u64_t matrixWidth,
                               u64_t logHeight, u64_t hash2LengthInBytes,
                               u64_t bucket2ForComputeH2Output, int omp_num,
                               vector<vector<u8_t>> sender_set)
   {
+
+    //初始化一个socket连接
+    void *client = initChannel(CLIENT, address, port);
+    if (client == nullptr)
+    {
+      return -11;
+    }
+    // assert(client);
+    // psi 发送方
+    long start2 = start_time();
+    PsiSender psiSender;
+    int fg = psiSender.init(commonSeed, senderSize, matrixWidth, logHeight, omp_num,
+                            hash2LengthInBytes, bucket2ForComputeH2Output);
+    if (fg)
+    {
+      return fg;
+    }
+    // assert(fg == 0);
+    //[1]生成基本ot协议的公共参数，并发送给对方
+    u8 *pubParamBuf = nullptr;
+    u64 pubParamBufSize = 0;
+    fg = psiSender.genPublicParamFromNpot(&pubParamBuf, &pubParamBufSize);
+    if (fg)
+    {
+      return fg;
+    }
+    // assert(fg == 0);
+    int n = send_data(client, (char *)pubParamBuf, pubParamBufSize);
+    // assert((u64)n == pubParamBufSize);
+    //[2]接收对方发过来的pk0sBuff
+    char *pk0sBuf = nullptr;
+    n = recv_data(client, &pk0sBuf);
+    if (n <= 0)
+    {
+      return -12;
+    }
+    // assert(n > 0);
+    u8 *uBuffOutput = nullptr;
+    u64 uBuffOutputSize = 0;
+    //[3]输入pk0s，生成uBuffOutput,并发送给对方
+    long start_TxorR = start_time();
+    fg = psiSender.genMatrixTxorRBuff((u8 *)pk0sBuf, n, &uBuffOutput, &uBuffOutputSize);
+    if (fg)
+    {
+      return fg;
+    }
+    printf("===>>发送方生成TxorR矩阵用时:%ld ms\n", get_use_time(start_TxorR));
+    // assert(fg == 0);
+    n = send_data(client, (char *)uBuffOutput, uBuffOutputSize);
+    // assert((u64)n == uBuffOutputSize);
+    //计算H1 start（避免等待）
+    printf("===>>发送方避免等待，开始计算hash1...\n");
+    fg = psiSender.computeAllHashOutputByH1(sender_set);
+    if (fg)
+    {
+      return fg;
+    }
+    // assert(fg == 0);
+    //计算H1 end
+    //[4]接收MatrixAxorD,生成矩阵C
+    char *matrixAxorD = nullptr;
+    long start_recv_AD = start_time();
+    n = recv_data(client, &matrixAxorD);
+    if (n <= 0)
+    {
+      return -12;
+    }
+    // assert(n > 0);
+    printf("===>>接收收到matrixAxorD用时:%ld ms\n", get_use_time(start_recv_AD));
+    //恢复矩阵C
+    long start3 = start_time();
+    fg = psiSender.recoverMatrixC((u8 *)matrixAxorD, n);
+    if (fg)
+    {
+      return fg;
+    }
+    // assert(fg == 0);
+    printf("===>>recoverMatrixC所需时间:%ldms\n", get_use_time(start3));
+    printf("===>>OT所需时间:%ldms\n", get_use_time(start2));
+    //循环发送hash输出给对方
+    u64 hashOutputOnceBuffSize = 0;
+    u8 *hashOutputOnceBuff = nullptr;
+    int totalCyc = senderSize / bucket2ForComputeH2Output;
+    int count = 0, countTmp = 10;
+    int ret = psiSender.isSendEnd();
+    printf("===>>isSendEnd:%d\n", ret);
+    long start4 = start_time();
+    long int start00;
+    for (; psiSender.isSendEnd() == 0;)
+    {
+#ifdef SOCKET_TEST
+      if (count < countTmp)
+      {
+        start00 = start_time();
+      }
+#endif
+      fg = psiSender.computeHashOutputToReceiverOnce(&hashOutputOnceBuff,
+                                                     &hashOutputOnceBuffSize);
+      if (fg)
+      {
+        return fg;
+      }
+#ifdef SOCKET_TEST
+      if (count < countTmp)
+      {
+        printf("count:%d,send:计算一次H2Output所需时间:%ldms\n", count, get_use_time(start00));
+      }
+#endif
+      n = send_data(client, (char *)hashOutputOnceBuff, hashOutputOnceBuffSize);
+      assert((u64)n == hashOutputOnceBuffSize);
+#if SOCKET_TEST
+      if (count < countTmp)
+      {
+        printf("count:%d,send:计算一次H2Output并发送所需时间:%ldms\n", count, get_use_time(start00));
+      }
+#endif
+      count++;
+    }
+    printf("===>>count:%d\n", count);
+    printf("sender: 匹配find用时：%ldms,totalCyc:%d\n", get_use_time(start4), totalCyc);
+    printf("sender: 总用时:%ldms\n", get_use_time(start2));
+    //释放mem, sender
+    releaseChannel(client);
+    printf("===>>oprf psi sender end...\n");
     return 0;
   }
 #endif

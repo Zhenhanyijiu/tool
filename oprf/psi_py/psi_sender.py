@@ -1,4 +1,4 @@
-from oprf_psi import OprfPsiSender
+from oprf_psi import OprfPsiSender, oprf_psi_sender
 import numpy as np
 import socket
 import sys
@@ -98,13 +98,14 @@ class Client(object):
             print("len:", len(b))
             raise Exception('length error')
 
-    def test_gen_data_set(self, n: int, psi_size: int = 200000) -> np.array:
-        ls = [''] * n
-        for i in range(0, psi_size):
-            ls[i] = md5(str(i).encode('utf-8')).hexdigest()[:21].encode('utf-8')
-        for i in range(psi_size, n):
-            ls[i] = md5((str(i) + "xx").encode('utf-8')).hexdigest()[:21].encode('utf-8')
-        return np.array(ls)
+
+def test_gen_data_set(n: int, psi_size: int = 200000) -> np.array:
+    ls = [''] * n
+    for i in range(0, psi_size):
+        ls[i] = md5(str(i).encode('utf-8')).hexdigest()[:21].encode('utf-8')
+    for i in range(psi_size, n):
+        ls[i] = md5((str(i) + "xx").encode('utf-8')).hexdigest()[:21].encode('utf-8')
+    return np.array(ls)
 
 
 def parse_args(argv):
@@ -185,6 +186,7 @@ if __name__ == "__main__":
           receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
     print("=========psi sender==========")
     for i in range(1):
-        send_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
+        # send_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
+        oprf_psi_sender(receiver_size, sender_size, )
         print("{}===>>end".format(i))
     # time.sleep(100)
