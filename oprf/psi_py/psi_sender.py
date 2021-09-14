@@ -1,4 +1,4 @@
-from oprf_psi import OprfPsiSender, oprf_psi_sender
+from oprf_psi import OprfPsiSender, oprf_psi_sender_by_socket
 import numpy as np
 import socket
 import sys
@@ -138,13 +138,13 @@ def parse_args(argv):
     return receiver_size, sender_size, psi_size, ip, port, omp_thread_num
 
 
-def get_use_time(start: int) -> float:
+def get_use_time(start: float) -> float:
     return (time.time() - start) * 1000
 
 
 def send_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num: int = 1):
     client = Client(ip, port)
-    sender_set = client.test_gen_data_set(sender_size, psi_size)
+    sender_set = test_gen_data_set(sender_size, psi_size)
     # 1. 双方首先协商的公共种子
     # common_seed:16字节的bytes，双方必须做到统一
     common_seed = b'1111111111111112'  # bytearray(b'1111111111111112')
@@ -185,8 +185,22 @@ if __name__ == "__main__":
     print('receiver_size, sender_size, psi_size, ip, port=',
           receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
     print("=========psi sender==========")
+    is_socket_test = True
     for i in range(1):
-        # send_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
-        oprf_psi_sender(receiver_size, sender_size, )
+        # 这种方式是调用不带socket的oprf-psi接口demo
+        if is_socket_test == False:
+            send_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
+        # 这种方式是调用带socket的oprf-psi接口demo
+        if is_socket_test:
+            start00 = time.time()
+            sender_set = test_gen_data_set(sender_size, psi_size)
+            print("###gen test data time:{}ms".format(get_use_time(start00)))
+            # common_seed:16字节的bytes，双方必须做到统一
+            common_seed = b'1111111111111112'
+            start00 = time.time()
+            oprf_psi_sender_by_socket(sender_size, sender_set,
+                                      ip.encode('utf-8'), port,
+                                      common_seed, omp_thread_num)
+            print("###oprf_psi_sender_by_socket:{}ms".format(get_use_time(start00)))
         print("{}===>>end".format(i))
     # time.sleep(100)

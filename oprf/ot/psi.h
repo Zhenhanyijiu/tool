@@ -149,6 +149,8 @@ namespace osuCrypto
                                   u64_t logHeight, u64_t hash2LengthInBytes,
                                   u64_t bucket2ForComputeH2Output, int omp_num,
                                   vector<vector<u8_t>> receiver_set, vector<u32_t> *psiResultsOutput);
+    //发送方不需要知道接收方的集合大小，不过这里也将接收方的集合receiverSize作为一个参数，
+    //只是为了接口统一的作用
     int oprf_psi_sender_process(u64_t receiverSize, u64_t senderSize, const char *address,
                                 int port, u8_t *commonSeed, u64_t matrixWidth,
                                 u64_t logHeight, u64_t hash2LengthInBytes,

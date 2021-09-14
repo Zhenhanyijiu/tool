@@ -1,4 +1,4 @@
-from oprf_psi import OprfPsiReceiver
+from oprf_psi import OprfPsiReceiver, oprf_psi_receiver_by_socket
 import numpy as np
 from hashlib import sha256, md5
 import sys
@@ -109,12 +109,13 @@ class Server(object):
             print("len:", len(b))
             raise Exception('length error')
 
-    def test_gen_data_set(self, n: int, psi_size: int = 200000) -> np.array:
-        ls = [b''] * n
-        for i in range(0, n):
-            ls[i] = md5(str(i).encode('utf-8')
-                        ).hexdigest()[:21].encode('utf-8')
-        return np.array(ls)
+
+def test_gen_data_set(n: int, psi_size: int = 200000) -> np.array:
+    ls = [b''] * n
+    for i in range(0, n):
+        ls[i] = md5(str(i).encode('utf-8')
+                    ).hexdigest()[:21].encode('utf-8')
+    return np.array(ls)
 
 
 def parse_args(argv):
@@ -147,14 +148,14 @@ def parse_args(argv):
     return receiver_size, sender_size, psi_size, ip, port, omp_thread_num
 
 
-def get_use_time(start: int) -> float:
-    return (time.time_ns() - start) / 1e6
+def get_use_time(start: float) -> float:
+    return (time.time() - start) * 1000
 
 
 def recv_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num: int = 1):
     server = Server(ip, port)
     start0 = time.time_ns()
-    receiver_set = server.test_gen_data_set(receiver_size, psi_size)
+    receiver_set = test_gen_data_set(receiver_size, psi_size)
 
     print("===>>生成测试数据用时：{}ms".format(get_use_time(start0)))
     # 1. 双方首先协商的公共种子
@@ -208,8 +209,22 @@ if __name__ == '__main__':
     print('receiver_size, sender_size, psi_size, ip, port=',
           receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
     print("=========psi receiver==========")
-
+    is_socket_test = True
     for i in range(1):
-        recv_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
+        # 这种方式是调用不带socket的oprf-psi接口demo
+        if is_socket_test == False:
+            recv_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
+        # 这种方式是调用带socket的oprf-psi接口demo
+        if is_socket_test:
+            start00 = time.time()
+            receiver_set = test_gen_data_set(receiver_size, psi_size)
+            print("###gen test data time:{}ms".format(get_use_time(start00)))
+            # common_seed:16字节的bytes，双方必须做到统一
+            common_seed = b'1111111111111112'
+            start00 = time.time()
+            psiResults = oprf_psi_receiver_by_socket(receiver_size, sender_size, receiver_set,
+                                                     ip.encode("utf-8"), port, common_seed, omp_thread_num)
+            print("###psiResults length:{},last index:{}".format(len(psiResults), psiResults[-1]))
+            print("###oprf_psi_receiver_by_socket time:{}ms".format(get_use_time(start00)))
         print("{}===>>end".format(i))
     # time.sleep(100)

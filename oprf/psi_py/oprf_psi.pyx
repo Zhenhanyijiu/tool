@@ -198,17 +198,11 @@ cdef class OprfPsiSender(object):
         # return hash2_output_buff[:hash2_output_buff_size], hash2_output_buff_size
         return hash2_output_val, hash2_output_buff_size
 
-#oprf_psi_receiver
-# int oprf_psi_receiver_process(u64_t receiverSize, u64_t senderSize, char*address,
-#                                   int port, u8_t *commonSeed, u64_t matrixWidth,
-#                                   u64_t logHeight, u64_t hash2LengthInBytes,
-#                                   u64_t bucket2ForComputeH2Output, int omp_num,
-#                                   vector[vector[u8_t]] receiver_set,
-#                                   vector[u32_t] *psiResultsOutput)
-def oprf_psi_receiver(receiverSize: int, senderSize: int, receiver_set: np.array,
-                      address: bytes, port: int, commonSeed: bytes, omp_num: int = 1,
-                      bucket2ForComputeH2Output: int = 10240, matrixWidth: int = 128,
-                      logHeight: int = 20, hash2LengthInBytes: int = 10)-> list:
+# 带有socket的oprf-psi 接收端接口
+def oprf_psi_receiver_by_socket(receiverSize: int, senderSize: int, receiver_set: np.array,
+                                address: bytes, port: int, commonSeed: bytes, omp_num: int = 1,
+                                bucket2ForComputeH2Output: int = 10240, matrixWidth: int = 128,
+                                logHeight: int = 20, hash2LengthInBytes: int = 10)-> list:
     if receiverSize != len(receiver_set):
         raise Exception('oprf_psi_receiver_process:receiverSize!=len(receiver_set) error')
     cdef vector[u32_t] psiResultsOutput
@@ -221,18 +215,13 @@ def oprf_psi_receiver(receiverSize: int, senderSize: int, receiver_set: np.array
         raise Exception('oprf_psi_receiver_process: error')
     return <list> psiResultsOutput
 
-# oprf_psi_sender_process
-# int oprf_psi_sender_process(u64_t receiverSize, u64_t senderSize, char*address,
-#                                 int port, u8_t *commonSeed, u64_t matrixWidth,
-#                                 u64_t logHeight, u64_t hash2LengthInBytes,
-#                                 u64_t bucket2ForComputeH2Output, int omp_num,
-#                                 vector[vector[u8_t]] sender_set)
-
-def oprf_psi_sender(receiverSize: int, senderSize: int, sender_set: np.array,
-                    address: bytes, port: int, commonSeed: bytes, omp_num: int = 1,
-                    bucket2ForComputeH2Output: int = 10240, matrixWidth: int = 128,
-                    logHeight: int = 20, hash2LengthInBytes: int = 10):
+# 带有socket的oprf-psi 发送端接口
+def oprf_psi_sender_by_socket(senderSize: int, sender_set: np.array,
+                              address: bytes, port: int, commonSeed: bytes, omp_num: int = 1,
+                              bucket2ForComputeH2Output: int = 10240, matrixWidth: int = 128,
+                              logHeight: int = 20, hash2LengthInBytes: int = 10):
     cdef vector[vector[u8_t]] senderSet = <vector[vector[u8_t]]> sender_set
+    receiverSize = 0
     cdef ret = oprf_psi_sender_process(receiverSize, senderSize, address, port,
                                        commonSeed, matrixWidth, logHeight,
                                        hash2LengthInBytes, bucket2ForComputeH2Output,
