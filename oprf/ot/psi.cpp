@@ -15,13 +15,13 @@ namespace osuCrypto
   long start_time()
   {
     struct timeval start;
-    gettimeofday(&start, NULL);
+    gettimeofday(&start, nullptr);
     return start.tv_sec * 1000000 + start.tv_usec;
   }
   long get_use_time(long start_time)
   {
     struct timeval end;
-    gettimeofday(&end, NULL);
+    gettimeofday(&end, nullptr);
     long usetime = end.tv_sec * 1000000 + end.tv_usec - start_time;
     return usetime / 1000;
   }
@@ -679,7 +679,7 @@ namespace osuCrypto
       infoArgs[i].aesInputStart = aesInput + i * stepLength;
       infoArgs[i].dataSetOutputStart = dataSetOutput + i * stepLength;
       infoArgs[i].dataSetInputStart = (vector<u8> *)(dataSetInput.data()) + i * stepLength;
-      int fg = pthread_create(&threads[i], NULL, process_hash1_thread, (void *)(infoArgs + i));
+      int fg = pthread_create(&threads[i], nullptr, process_hash1_thread, (void *)(infoArgs + i));
       if (fg)
       {
         printf(">>>create thread error\n");

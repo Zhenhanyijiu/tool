@@ -82,7 +82,7 @@ namespace osuCrypto
         u64 fieldElementSize = g.sizeBytes();
         // u64 encKeySize = encKeys.size();
         u64 encKeySize = this->otMsgPairSize;
-        if (pk0Buf == NULL || pk0BufSize != fieldElementSize * encKeySize)
+        if (pk0Buf == nullptr || pk0BufSize != fieldElementSize * encKeySize)
         {
             print_error(-2);
             return -2;
@@ -166,7 +166,7 @@ namespace osuCrypto
         u64 rNum = choices.size();
         cout << "rNum:" << rNum << endl;
         cout << "otMsgPairSize:" << this->otMsgPairSize << endl;
-        if (pubParamBuf == NULL || pk0Buf == NULL || rNum != otMsgPairSize)
+        if (pubParamBuf == nullptr || pk0Buf == nullptr || rNum != otMsgPairSize)
         {
             print_error(-4);
             return -4;

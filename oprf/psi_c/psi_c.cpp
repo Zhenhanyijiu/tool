@@ -14,9 +14,9 @@ typedef struct psi_sender
 void *new_psi_sender(char *common_seed, ui64 sender_size, int omp_num)
 {
     psi_sender *psi_s = (psi_sender *)malloc(sizeof(psi_sender));
-    if (psi_s == NULL)
+    if (psi_s == nullptr)
     {
-        return NULL;
+        return nullptr;
     }
     psi_s->sender_size = sender_size;
     oc::PsiSender *sender = new oc::PsiSender;
@@ -25,8 +25,8 @@ void *new_psi_sender(char *common_seed, ui64 sender_size, int omp_num)
     if (ret)
     {
         free(psi_s);
-        psi_s = NULL;
-        return NULL;
+        psi_s = nullptr;
+        return nullptr;
     }
     psi_s->sender = sender;
     return psi_s;
@@ -38,7 +38,7 @@ void release_psi_sender(void *psi_s)
     {
         delete s->sender;
         free(psi_s);
-        psi_s = NULL;
+        psi_s = nullptr;
     }
 }
 
@@ -91,10 +91,10 @@ int is_send_end(void *psi_s)
 }
 
 // int computeHashOutputToReceiverOnce(u8_t *hashOutputBuff, u64_t *sendBuffSize);
-int compute_hash_output_to_receiver_once(void *psi_s, char *hashOutputBuff, ui64 *sendBuffSize)
+int compute_hash_output_to_receiver_once(void *psi_s, char **hashOutputBuff, ui64 *sendBuffSize)
 {
     psi_sender *s = (psi_sender *)psi_s;
-    return s->sender->computeHashOutputToReceiverOnce((oc::u8_t *)hashOutputBuff,
+    return s->sender->computeHashOutputToReceiverOnce((oc::u8_t **)hashOutputBuff,
                                                       (oc::u64_t *)sendBuffSize);
 }
 
@@ -110,9 +110,9 @@ typedef struct psi_receiver
 void *new_psi_receiver(char *common_seed, ui64 receiver_size, ui64 sender_size, int omp_num)
 {
     psi_receiver *psi_r = (psi_receiver *)malloc(sizeof(psi_receiver));
-    if (psi_r == NULL)
+    if (psi_r == nullptr)
     {
-        return NULL;
+        return nullptr;
     }
 
     psi_r->sender_size = sender_size;
@@ -122,8 +122,8 @@ void *new_psi_receiver(char *common_seed, ui64 receiver_size, ui64 sender_size, 
     if (ret)
     {
         free(psi_r);
-        psi_r = NULL;
-        return NULL;
+        psi_r = nullptr;
+        return nullptr;
     }
     return psi_r;
 }
@@ -132,7 +132,7 @@ void release_psi_receiver(void *psi_r)
     if (psi_r)
     {
         free(psi_r);
-        psi_r = NULL;
+        psi_r = nullptr;
     }
 }
 // int genPK0FromNpot(u8_t *pubParamBuf, const u64_t pubParamBufByteSize,
@@ -182,6 +182,7 @@ int is_recv_end(void *psi_r)
     return r->receiver.isRecvEnd();
 }
 
+#if (defined NOMP) || (defined OMP_ONLY)
 // int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
 //                                             vector<u32_t> *psiMsgIndex);
 int recv_from_sender_and_compute_psi_once(void *psi_r, const char *recv_buff, const ui64 recvBufSize,
@@ -196,7 +197,31 @@ int recv_from_sender_and_compute_psi_once(void *psi_r, const char *recv_buff, co
     {
         return -3;
     }
+
     *psi_array = (unsigned int *)(r->psi_array.data());
     *psi_array_size = r->psi_array.size();
     return 0;
 }
+#endif
+#ifdef OMP_POOL
+int recv_from_sender_and_compute_psi_once(void *psi_r, const char *recv_buff,
+                                          const ui64 recv_buf_size)
+{
+    psi_receiver *r = (psi_receiver *)psi_r;
+    int ret = r->receiver.recvFromSenderAndComputePSIOnce((oc::u8_t *)recv_buff, recv_buf_size);
+    if (ret)
+    {
+        return -3;
+    }
+    return 0;
+}
+int get_psi_results_for_all(void *psi_r, unsigned int **psi_array, ui64 *psi_array_size)
+{
+    psi_receiver *r = (psi_receiver *)psi_r;
+    r->psi_array.clear();
+    r->receiver.getPsiResultsForAll(&(r->psi_array));
+    *psi_array = (unsigned int *)(r->psi_array.data());
+    *psi_array_size = r->psi_array.size();
+    return 0;
+}
+#endif

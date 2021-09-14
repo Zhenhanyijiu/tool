@@ -4,7 +4,7 @@
 extern "C"
 {
 #endif
-    typedef unsigned long long int ui64;
+    typedef unsigned long int ui64;
     //sender
     void *new_psi_sender(char *common_seed, ui64 sender_size, int omp_num);
     void release_psi_sender(void *psi_s);
@@ -16,7 +16,7 @@ extern "C"
     int recover_matrix_C(void *psi_s, const char *recv_matrix_A_xor_D,
                          const ui64 recv_matrix_A_xor_D_size);
     int is_send_end(void *psi_s);
-    int compute_hash_output_to_receiver_once(char *hashOutputBuff, ui64 *sendBuffSize);
+    int compute_hash_output_to_receiver_once(void *psi_s, char **hashOutputBuff, ui64 *sendBuffSize);
     //recevicer
     void *new_psi_receiver(char *common_seed, ui64 receiver_size, ui64 sender_size,
                            int omp_num);
@@ -28,8 +28,16 @@ extern "C"
                          char **sendMatrixADBuff, ui64 *sendMatixADBuffSize);
     int gen_all_hash_map(void *psi_r);
     int is_recv_end(void *psi_r);
-    int recv_from_sender_and_compute_psi_once(void *psi_r, const char *recv_buff, const ui64 recvBufSize,
+#if (defined NOMP) || (defined OMP_ONLY)
+    int recv_from_sender_and_compute_psi_once(void *psi_r, const char *recv_buff,
+                                              const ui64 recv_buf_size,
                                               unsigned int **psi_array, ui64 *psi_array_size);
+#endif
+#ifdef OMP_POOL
+    int recv_from_sender_and_compute_psi_once(void *psi_r, const char *recv_buff,
+                                              const ui64 recv_buf_size);
+    int get_psi_results_for_all(void *psi_r, unsigned int **psi_array, ui64 *psi_array_size);
+#endif
 #ifdef __cplusplus
 }
 #endif
