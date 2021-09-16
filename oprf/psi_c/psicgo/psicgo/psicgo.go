@@ -1,7 +1,7 @@
 package psicgo
 
 /*
-#cgo CFLAGS:-DOMP_POOL
+#cgo CFLAGS:-DOMP_POOL -DENABLE_MIRACL
 #cgo CFLAGS: -I./include
 #cgo LDFLAGS: -L./lib -lpsi
 #include<string.h>
@@ -22,6 +22,7 @@ import (
 	"unsafe"
 )
 
+//-DENABLE_MIRACL
 type PsiSender struct {
 	sender     unsafe.Pointer
 	senderSize uint64
@@ -140,7 +141,7 @@ func (s *PsiSender) ComputeHashOutputToReceiverOnce() (hashOutputBuff []byte, er
 	}
 
 	hashOutputBuff = make([]byte, uint64(sendBuffSize))
-	head := (*reflect.SliceHeader)(unsafe.Pointer(&hashOutput))
+	head := (*reflect.SliceHeader)(unsafe.Pointer(&hashOutputBuff))
 	C.memcpy(unsafe.Pointer(head.Data), unsafe.Pointer(hashOutput), C.ulong(sendBuffSize))
 	return hashOutputBuff, nil
 }
@@ -188,11 +189,8 @@ func (r *PsiReceiver) GenPk0sFromNpot(pubParam []byte) (pk0s []byte, err error) 
 	pubParamBufByteSize := C.ulong(head.Len)
 	var pk0sbuf *C.char
 	var pk0sBufSize C.ulong
-	fmt.Printf("---------------\n")
 	ret := C.gen_pk0s_from_npot(r.receiver, pubParamBuf, pubParamBufByteSize, &pk0sbuf, &pk0sBufSize)
-	fmt.Printf("============ret:%v\n", int(ret))
 	if int(ret) != 0 {
-		fmt.Printf("============ret:%v\n", int(ret))
 		return nil, errors.New("gen_pk0s_from_npot error for C")
 	}
 	pk0s = make([]byte, uint64(pk0sBufSize))
@@ -270,6 +268,7 @@ func (r *PsiReceiver) GetPsiResultsForAll() (psiResults []uint32, err error) {
 	if int(ret) != 0 {
 		return nil, errors.New("recv_from_sender_and_compute_psi_once error for C")
 	}
+	fmt.Printf("###cgo:psi_array_size:%v\n", uint64(psi_array_size))
 	psiResults = make([]uint32, uint64(psi_array_size))
 	head := (*reflect.SliceHeader)(unsafe.Pointer(&psiResults))
 	C.memcpy(unsafe.Pointer(head.Data), unsafe.Pointer(psi_array), psi_array_size*4)

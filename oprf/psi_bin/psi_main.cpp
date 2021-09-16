@@ -446,9 +446,10 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   // sleep(20);
   // assert(1 == 3);
 }
-#if NOSOCKET_TEST
+#ifdef NOSOCKET_TEST
 int main(int argc, char **argv)
 {
+  printf("=============no socket test==============\n");
   // int ptype = atoi(argv[1]); //0 send;1 recv
   oc::CLP cmd;
   cmd.parse(argc, argv);
@@ -554,7 +555,7 @@ int main(int argc, char **argv)
       // return 0;
     }
     printf("===>>(%d)测试用时：%ld ms,sizeof(long):%ld\n", i, get_use_time(start0), sizeof(long));
-    int sl = 30;
+    // int sl = 30;
     // sleep(sl);
     // printf("==============>>i(%d)睡眠了%d s，开始下一次测试\n", i, sl);
   }

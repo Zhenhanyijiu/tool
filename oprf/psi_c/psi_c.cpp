@@ -68,9 +68,9 @@ int compute_all_hash_output_byH1(void *psi_s, const char **sender_set,
     vector<vector<oc::u8_t>> senderSet(sender_size);
     for (oc::u64_t i = 0; i < sender_size; i++)
     {
-        // int len = strlen(sender_set[i]);
-        senderSet[i].resize(id_size);
-        memcpy(senderSet[i].data(), sender_set[i], id_size);
+        int id_size_tmp = strlen(sender_set[i]);
+        senderSet[i].resize(id_size_tmp);
+        memcpy(senderSet[i].data(), sender_set[i], id_size_tmp);
     }
     return s->sender->computeAllHashOutputByH1(senderSet);
     // return 0;
@@ -94,17 +94,18 @@ int is_send_end(void *psi_s)
 int compute_hash_output_to_receiver_once(void *psi_s, char **hashOutputBuff, ui64 *sendBuffSize)
 {
     psi_sender *s = (psi_sender *)psi_s;
-    return s->sender->computeHashOutputToReceiverOnce((oc::u8_t **)hashOutputBuff,
-                                                      (oc::u64_t *)sendBuffSize);
+    s->sender->computeHashOutputToReceiverOnce((oc::u8_t **)hashOutputBuff,
+                                               (oc::u64_t *)sendBuffSize);
+    return 0;
 }
 
 ////////////////recv
 typedef struct psi_receiver
 {
-    oc::PsiReceiver receiver;
+    oc::PsiReceiver *receiver;
     ui64 receiver_size;
     ui64 sender_size;
-    vector<oc::u32_t> psi_array;
+    vector<oc::u32_t> *psi_array;
 } psi_receiver;
 
 void *new_psi_receiver(char *common_seed, ui64 receiver_size, ui64 sender_size, int omp_num)
@@ -117,20 +118,26 @@ void *new_psi_receiver(char *common_seed, ui64 receiver_size, ui64 sender_size, 
 
     psi_r->sender_size = sender_size;
     psi_r->receiver_size = receiver_size;
-    int ret = psi_r->receiver.init((oc::u8_t *)common_seed, receiver_size, sender_size,
-                                   128, 20, omp_num, 10, 10240);
+    oc::PsiReceiver *receiver = new oc::PsiReceiver;
+    int ret = receiver->init((oc::u8_t *)common_seed, receiver_size, sender_size,
+                             128, 20, omp_num, 10, 10240);
     if (ret)
     {
         free(psi_r);
         psi_r = nullptr;
         return nullptr;
     }
+    psi_r->receiver = receiver;
+    psi_r->psi_array = new vector<oc::u32_t>;
     return psi_r;
 }
 void release_psi_receiver(void *psi_r)
 {
+    psi_receiver *r = (psi_receiver *)psi_r;
     if (psi_r)
     {
+        delete r->receiver;
+        delete r->psi_array;
         free(psi_r);
         psi_r = nullptr;
     }
@@ -141,8 +148,8 @@ int gen_pk0s_from_npot(void *psi_r, char *pubParamBuf, const ui64 pubParamBufByt
                        char **pk0Buf, ui64 *pk0BufSize)
 {
     psi_receiver *r = (psi_receiver *)psi_r;
-    return r->receiver.genPK0FromNpot((oc::u8_t *)pubParamBuf, (oc::u64_t)pubParamBufByteSize,
-                                      (oc::u8_t **)pk0Buf, (oc::u64_t *)pk0BufSize);
+    return r->receiver->genPK0FromNpot((oc::u8_t *)pubParamBuf, (oc::u64_t)pubParamBufByteSize,
+                                       (oc::u8_t **)pk0Buf, (oc::u64_t *)pk0BufSize);
     // return 0;
 }
 
@@ -161,28 +168,30 @@ int get_matrix_AxorD(void *psi_r, const char *uBuffInputTxorR, const ui64 uBuffI
     vector<vector<oc::u8_t>> receiverSet(receiver_set_size);
     for (oc::u64_t i = 0; i < receiver_set_size; i++)
     {
-        receiverSet[i].resize(id_size);
-        memcpy(receiverSet[i].data(), receiver_set[i], id_size);
+        int id_size_tmp = strlen(receiver_set[i]);
+        receiverSet[i].resize(id_size_tmp);
+        memcpy(receiverSet[i].data(), receiver_set[i], id_size_tmp);
     }
-    return r->receiver.getSendMatrixADBuff((oc::u8_t *)uBuffInputTxorR, uBuffInputSize, receiverSet,
-                                           (oc::u8_t **)sendMatrixADBuff,
-                                           (oc::u64_t *)sendMatixADBuffSize);
+    return r->receiver->getSendMatrixADBuff((oc::u8_t *)uBuffInputTxorR, uBuffInputSize, receiverSet,
+                                            (oc::u8_t **)sendMatrixADBuff,
+                                            (oc::u64_t *)sendMatixADBuffSize);
 }
 
 //int genenateAllHashesMap();
 int gen_all_hash_map(void *psi_r)
 {
     psi_receiver *r = (psi_receiver *)psi_r;
-    return r->receiver.genenateAllHashesMap();
+    return r->receiver->genenateAllHashesMap();
 }
 //int isRecvEnd();
 int is_recv_end(void *psi_r)
 {
     psi_receiver *r = (psi_receiver *)psi_r;
-    return r->receiver.isRecvEnd();
+    return r->receiver->isRecvEnd();
 }
 
 #if (defined NOMP) || (defined OMP_ONLY)
+//未测试，暂时不使用这部分逻辑
 // int recvFromSenderAndComputePSIOnce(const u8_t *recvBuff, const u64_t recvBufSize,
 //                                             vector<u32_t> *psiMsgIndex);
 int recv_from_sender_and_compute_psi_once(void *psi_r, const char *recv_buff, const ui64 recvBufSize,
@@ -191,8 +200,8 @@ int recv_from_sender_and_compute_psi_once(void *psi_r, const char *recv_buff, co
     // vector<oc::u32_t> psiMsgIndex;
     psi_receiver *r = (psi_receiver *)psi_r;
     r->psi_array.clear();
-    int ret = r->receiver.recvFromSenderAndComputePSIOnce((oc::u8_t *)recv_buff, recvBufSize,
-                                                          &(r->psi_array));
+    int ret = r->receiver->recvFromSenderAndComputePSIOnce((oc::u8_t *)recv_buff, recvBufSize,
+                                                           &(r->psi_array));
     if (ret)
     {
         return -3;
@@ -208,20 +217,21 @@ int recv_from_sender_and_compute_psi_once(void *psi_r, const char *recv_buff,
                                           const ui64 recv_buf_size)
 {
     psi_receiver *r = (psi_receiver *)psi_r;
-    int ret = r->receiver.recvFromSenderAndComputePSIOnce((oc::u8_t *)recv_buff, recv_buf_size);
+    int ret = r->receiver->recvFromSenderAndComputePSIOnce((oc::u8_t *)recv_buff, recv_buf_size);
     if (ret)
     {
         return -3;
     }
     return 0;
 }
-int get_psi_results_for_all(void *psi_r, unsigned int **psi_array, ui64 *psi_array_size)
+int get_psi_results_for_all(void *psi_r, unsigned int **psi_array_out, ui64 *psi_array_size)
 {
     psi_receiver *r = (psi_receiver *)psi_r;
-    r->psi_array.clear();
-    r->receiver.getPsiResultsForAll(&(r->psi_array));
-    *psi_array = (unsigned int *)(r->psi_array.data());
-    *psi_array_size = r->psi_array.size();
+    r->psi_array->clear();
+    // vector<oc::u32_t> psi_array;
+    r->receiver->getPsiResultsForAll(r->psi_array);
+    *psi_array_out = (unsigned int *)(r->psi_array->data());
+    *psi_array_size = r->psi_array->size();
     return 0;
 }
 #endif

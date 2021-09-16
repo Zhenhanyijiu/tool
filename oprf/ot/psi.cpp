@@ -1797,6 +1797,7 @@ namespace osuCrypto
         (*psiResultsOutput).emplace_back(this->psiResults[resultIndex][j]);
       }
     }
+    printf("===>>psiResults in getPsiResultsForAll,size:%ld\n", (*psiResultsOutput).size());
     return 0;
   }
 #endif
