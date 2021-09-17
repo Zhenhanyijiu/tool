@@ -144,15 +144,18 @@ def get_use_time(start: float) -> float:
 
 def send_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num: int = 1):
     client = Client(ip, port)
+    start_test_data = time.time()
     sender_set = test_gen_data_set(sender_size, psi_size)
+    print("###>>生成测试数据用时:{}".format(get_use_time(start_test_data)))
     # 1. 双方首先协商的公共种子
     # common_seed:16字节的bytes，双方必须做到统一
     common_seed = b'1111111111111112'  # bytearray(b'1111111111111112')
     # 2. 创建接收方对象
+    start_sender = time.time()
     psi_sender = Sender(common_seed, sender_size, omp_thread_num)
     # 3. 本地生成公共参数public_param
     pub_param, pub_param_byte_size = psi_sender.gen_public_param()
-    print("===>", len(pub_param), pub_param, pub_param_byte_size)
+    print("###>>", len(pub_param), pub_param, pub_param_byte_size)
     assert len(pub_param) == pub_param_byte_size
     # 4. 发送公共参数给对方
     client.send_data(pub_param)
@@ -161,11 +164,11 @@ def send_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num:
     start0 = time.time()
     matrix_TxorR, _ = psi_sender.gen_matrix_T_xor_R(pk0s)
     # print('===>>matrix_TxorR:', matrix_TxorR, len(matrix_TxorR))
-    print("===>>发送方生成matrix_TxorR用时:{}ms".format(get_use_time(start0)))
+    print("###>>发送方生成matrix_TxorR用时:{}ms".format(get_use_time(start0)))
     # 6.将T_xor_R发送给对方
     client.send_data(matrix_TxorR)
     # 6.1接着计算所有的id的hash1值，避免改节点长时间等待
-    print('===>>开始类型转化、计算hash1')
+    print('###>>开始类型转化、计算hash1')
     psi_sender.compute_all_hash_output_by_H1(sender_set)
     # 7.接收对方发来的 矩阵matrix_A_xor_D
     matrix_A_xor_D = client.recv_data()
@@ -176,7 +179,8 @@ def send_process(receiver_size, sender_size, psi_size, ip, port, omp_thread_num:
         hash2_output_val, _ = psi_sender.compute_hash2_output_to_receiver()
         # 发送数据
         client.send_data(hash2_output_val)
-    print('===>>发送方结束...')
+    print("###>>整个过程用时:{}".format(get_use_time(start_sender)))
+    print('###>>发送方结束...')
     pass
 
 
@@ -185,7 +189,7 @@ if __name__ == "__main__":
     print('receiver_size, sender_size, psi_size, ip, port=',
           receiver_size, sender_size, psi_size, ip, port, omp_thread_num)
     print("=========psi sender==========")
-    is_socket_test = True
+    is_socket_test = False
     for i in range(1):
         # 这种方式是调用不带socket的oprf-psi接口demo
         if is_socket_test == False:
@@ -196,15 +200,15 @@ if __name__ == "__main__":
             print("====== socket test ======")
             start00 = time.time()
             sender_set = test_gen_data_set(sender_size, psi_size)
-            print("###gen test data time:{}ms".format(get_use_time(start00)))
+            print("###>>gen test data time:{}ms".format(get_use_time(start00)))
             # common_seed:16字节的bytes，双方必须做到统一
             common_seed = b'1111111111111112'
             start00 = time.time()
             oprf_psi_sender_by_socket(sender_size, sender_set,
                                       ip.encode('utf-8'), port,
                                       common_seed, omp_thread_num)
-            print("###oprf_psi_sender_by_socket:{}ms".format(get_use_time(start00)))
-        print("{}===>>end".format(i))
+            print("###>>oprf_psi_sender_by_socket:{}ms".format(get_use_time(start00)))
+        print("i:{}###>>end".format(i))
         sl = 32
         time.sleep(30)
         print("睡眠{}s".format(sl))

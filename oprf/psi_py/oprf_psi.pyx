@@ -206,7 +206,9 @@ def oprf_psi_receiver_by_socket(receiverSize: int, senderSize: int, receiver_set
     if receiverSize != len(receiver_set):
         raise Exception('oprf_psi_receiver_process:receiverSize!=len(receiver_set) error')
     cdef vector[u32_t] psiResultsOutput
+    start0 = time.time()
     cdef vector[vector[u8_t]] receiverSet = <vector[vector[u8_t]]> receiver_set
+    print("###类型转换用时:{}s".format(time.time() - start0))
     cdef ret = oprf_psi_receiver_process(receiverSize, senderSize, address, port,
                                          commonSeed, matrixWidth, logHeight,
                                          hash2LengthInBytes, bucket2ForComputeH2Output,
@@ -220,6 +222,8 @@ def oprf_psi_sender_by_socket(senderSize: int, sender_set: np.array,
                               address: bytes, port: int, commonSeed: bytes, omp_num: int = 1,
                               bucket2ForComputeH2Output: int = 10240, matrixWidth: int = 128,
                               logHeight: int = 20, hash2LengthInBytes: int = 10):
+    if senderSize != len(sender_set):
+        raise Exception('oprf_psi_sender_process:senderSize != len(sender_set) error')
     cdef vector[vector[u8_t]] senderSet = <vector[vector[u8_t]]> sender_set
     receiverSize = 0
     cdef ret = oprf_psi_sender_process(receiverSize, senderSize, address, port,

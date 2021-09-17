@@ -1,7 +1,8 @@
 date
 #     0:send,1:recv  
-time ./psi -r 1 -w 128 -h 20 -ss 5000000  -rs 5000000 -sd 20 -ids 21 -omp $1
+# time ./psi -r 1 -w 128 -h 20 -ss 5000000  -rs 5000000 -sd 20 -ids 21 -omp $1
 # time ./psi -r 1 -w 128 -h 20 -ss 100000000  -rs 100000000 -sd 110 -ids 21 -ip 10.100.3.15 -omp $1
+time ./psi -r 1 -w 64 -h 20 -ss 200000000  -rs 200000000 -sd 10 -ids 21 -ip 10.100.3.15 -omp $1 -ps 200000000
 # time ./psi -r 1 -w 128 -h 20 -ss 10000000  -rs 10000000 -sd 110 -ids 32 -ip 172.16.48.172 -omp $1
 # time ./psi -r 1 -w 128 -h 20 -ss 100000000  -rs 100000000 -sd 210 -ids 21 -ip 172.16.48.172
 #./psi -r 1 -w 100 -h 20 -ss 60000000 -rs 3000000 -sd 22 
