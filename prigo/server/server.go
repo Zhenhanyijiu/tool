@@ -38,7 +38,7 @@ func (s *Server) SaveDataToCache(c *gin.Context) {
 		fmt.Printf("===>>set val error:%v", err)
 		return
 	}
-	message.Log.Infof("===>>本地缓存 set data ok")
+	//message.Log.Infof("===>>本地缓存 set data ok")
 	//todo:不需要响应返回
 	//c.JSON(200, gin.H{
 	//	"msg": "ok",

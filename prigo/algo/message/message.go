@@ -1,6 +1,9 @@
 package message
 
-import "github.com/sirupsen/logrus"
+import (
+	"encoding/json"
+	"github.com/sirupsen/logrus"
+)
 
 var Log *logrus.Logger
 
@@ -22,11 +25,11 @@ type Node struct {
 	Ip     string `json:"ip"`
 }
 type MsgRequest struct {
-	FlowId       string      `json:"flow_id"`
-	AlgoId       string      `json:"algo_id"`
-	CurrNode     Node        `json:"curr_node"`
-	PartnerNodes []Node      `json:"partner_ids"`
-	Params       interface{} `json:"params"`
+	FlowId       string          `json:"flow_id"`
+	AlgoId       string          `json:"algo_id"`
+	CurrNode     Node            `json:"curr_node"`
+	PartnerNodes []Node          `json:"partner_ids"`
+	Params       json.RawMessage `json:"params"`
 }
 type MsgChannelRequest struct {
 	Key  string `json:"key"`

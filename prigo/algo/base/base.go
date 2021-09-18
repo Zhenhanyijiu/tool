@@ -2,12 +2,14 @@ package base
 
 import (
 	"prigo/algo/message"
+	"prigo/algo/oprfpsi"
 	"prigo/algo/psi"
 )
 
 //register algo
 var AlgoTable = map[string]message.NewAlgoFunc{
 	"PsiAlgo": psi.NewPsi,
+	"OprfPsi": oprfpsi.NewOprfPsi,
 }
 
 //func SetAlgorithm(key string, val Algorithm) {

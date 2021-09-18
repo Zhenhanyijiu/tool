@@ -12,7 +12,7 @@ import (
 
 var ErrNotFound = bigcache.ErrEntryNotFound
 
-type SendDataFunc func(string, string, []byte)
+type SendDataFunc func(targetUrl string, key string, data []byte)
 type RecvDataFunc func(key string, timeout int) ([]byte, error)
 type GetSendUrlFunc func(targetIp string) string
 type GetSendKeyFunc func(flowId, curNodeId, targetNodeId, keyName string) string
