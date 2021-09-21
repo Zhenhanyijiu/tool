@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+var ps = 2000000
+
 type OprfPsiParam struct {
 	ReceiverSize uint64 `json:"receiver_size"`
 	SenderSize   uint64 `json:"sender_size"`
@@ -86,7 +88,7 @@ func (p *OprfPsi) startGuest(msg message.MsgRequest) {
 	senderNode := msg.PartnerNodes[0]
 	comSeed := []byte{1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1}
 	//receiverSize, senderSize := uint64(100), uint64(100)
-	recvSet := genDataSetTest(1, oprfPsiParam.ReceiverSize, 10000)
+	recvSet := genDataSetTest(1, oprfPsiParam.ReceiverSize, uint64(ps))
 	start := time.Now()
 	//psiReceiver
 	r, err := psicgo.NewPsiReceiver(comSeed, oprfPsiParam.ReceiverSize, oprfPsiParam.SenderSize, oprfPsiParam.OmpNum)
@@ -152,7 +154,7 @@ func (p *OprfPsi) startHost(msg message.MsgRequest) {
 	comSeed := []byte{1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1}
 	//_, senderSize := uint64(100), uint64(100)
 	//recvSet := genDataSetTest(1, receiverSize, 100)
-	sendSet := genDataSetTest(0, oprfPsiParam.SenderSize, 10000)
+	sendSet := genDataSetTest(0, oprfPsiParam.SenderSize, uint64(ps))
 	recvNode := msg.PartnerNodes[0]
 	startTime := time.Now()
 	//1.new psiSender

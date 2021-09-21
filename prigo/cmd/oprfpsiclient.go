@@ -18,16 +18,16 @@ type OprfPsiParam struct {
 }
 
 func main() {
-	//ip1 := "127.0.0.1:8800"
-	ip1 := "10.100.3.15:8800"
-	//ip2 := "127.0.0.1:8801"
-	ip2 := "10.100.3.16:8801"
+	ip1 := "127.0.0.1:8000"
+	//ip1 := "10.100.3.15:8800"
+	ip2 := "127.0.0.1:8001"
+	//ip2 := "10.100.3.16:8801"
 	url1 := "http://" + ip1 + "/v1/algo/start"
 	url2 := "http://" + ip2 + "/v1/algo/start"
 	rs := flag.Uint64("rs", 10000000, "receiver size")
 	ss := flag.Uint64("ss", 10000000, "sender size")
 	flag.Parse()
-	oprfpsiparam := OprfPsiParam{ReceiverSize: *rs, SenderSize: *ss}
+	oprfpsiparam := OprfPsiParam{ReceiverSize: *rs, SenderSize: *ss, OmpNum: 4}
 	rawParam, _ := json.Marshal(&oprfpsiparam)
 	req1 := message.MsgRequest{
 		//FlowID: uu.String(),
@@ -63,8 +63,11 @@ func main() {
 		},
 		Params: rawParam,
 	}
-	go startOprfPsiPost(req1, url1)
-	startOprfPsiPost(req2, url2)
+	for i := 0; i < 10; i++ {
+		go startOprfPsiPost(req1, url1)
+		startOprfPsiPost(req2, url2)
+	}
+
 }
 
 func startOprfPsiPost(data interface{}, urlData string) {

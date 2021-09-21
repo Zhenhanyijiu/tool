@@ -10,16 +10,18 @@ import (
 )
 
 type Server struct {
-	NodeId  string
-	Sa      string
-	newAlgo func(string) message.Algorithm
+	NodeId     string
+	Sa         string
+	newAlgo    func(string) message.Algorithm
+	maxRequest chan struct{}
 }
 
 func NewServer(NodeId, sa string) *Server {
 	return &Server{
-		NodeId:  NodeId,
-		Sa:      sa,
-		newAlgo: base.GetAlgorithm,
+		NodeId:     NodeId,
+		Sa:         sa,
+		newAlgo:    base.GetAlgorithm,
+		maxRequest: make(chan struct{}, 1),
 	}
 }
 
@@ -49,6 +51,10 @@ func (s *Server) SaveDataToCache(c *gin.Context) {
 /algo/start
 */
 func (s *Server) Start(c *gin.Context) {
+	s.maxRequest <- struct{}{}
+	defer func() {
+		<-s.maxRequest
+	}()
 	var req message.MsgRequest
 	c.BindJSON(&req)
 	algo := s.newAlgo(req.AlgoId)
