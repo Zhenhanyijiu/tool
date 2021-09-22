@@ -12,7 +12,8 @@ import (
 	"time"
 )
 
-var ps = 2000000
+var ps = 20000
+var timeout = 3600
 
 type OprfPsiParam struct {
 	ReceiverSize uint64 `json:"receiver_size"`
@@ -98,7 +99,7 @@ func (p *OprfPsi) startGuest(msg message.MsgRequest) {
 	defer func() { r.Release() }()
 	//1.接收对方pubParam
 	pubParamKey := p.getRecvKey(msg.FlowId, senderNode.NodeID, msg.CurrNode.NodeID, "pubParam")
-	pubParam, err := p.recvData(pubParamKey, 100)
+	pubParam, err := p.recvData(pubParamKey, timeout)
 	//2.生成pk0s
 	pk0s, err := r.GenPk0sFromNpot(pubParam)
 	if err != nil {
@@ -111,7 +112,7 @@ func (p *OprfPsi) startGuest(msg message.MsgRequest) {
 	p.sendData(tarUrl, pk0sKey, pk0s)
 	//4.接收TxorR
 	TxorRKey := p.getRecvKey(msg.FlowId, senderNode.NodeID, msg.CurrNode.NodeID, "TxorR")
-	TxorR, err := p.recvData(TxorRKey, 100)
+	TxorR, err := p.recvData(TxorRKey, timeout)
 	//5.生成AxorD
 	AxorD, err := r.GetMatrixAxorD(TxorR, recvSet)
 	if err != nil {
@@ -130,7 +131,7 @@ func (p *OprfPsi) startGuest(msg message.MsgRequest) {
 	count := 0
 	for r.IsRecvEnd() == false {
 		hashOutputKey := p.getRecvKey(msg.FlowId, senderNode.NodeID, msg.CurrNode.NodeID, "hashOutput"+strconv.Itoa(count))
-		hashOutput, err := p.recvData(hashOutputKey, 100)
+		hashOutput, err := p.recvData(hashOutputKey, timeout)
 		err = r.RecvFromSenderAndComputePsiOnce(hashOutput)
 		if err != nil {
 			panic(err)
@@ -174,7 +175,7 @@ func (p *OprfPsi) startHost(msg message.MsgRequest) {
 	p.sendData(tarUrl, pubParamKey, pubParam)
 	//4.接收pk0s
 	pk0sKey := p.getRecvKey(msg.FlowId, recvNode.NodeID, msg.CurrNode.NodeID, "pk0s")
-	pk0s, err := p.recvData(pk0sKey, 100)
+	pk0s, err := p.recvData(pk0sKey, timeout)
 	//5.生成TxorR
 	TxorR, err := s.GenMatrixTxorR(pk0s)
 	if err != nil {
@@ -191,7 +192,7 @@ func (p *OprfPsi) startHost(msg message.MsgRequest) {
 	}
 	//7.接收AxorD
 	AxorDKey := p.getRecvKey(msg.FlowId, recvNode.NodeID, msg.CurrNode.NodeID, "AxorD")
-	AxorD, err := p.recvData(AxorDKey, 100)
+	AxorD, err := p.recvData(AxorDKey, timeout)
 	//8.恢复矩阵C
 	err = s.RecoverMatrixC(AxorD)
 	if err != nil {

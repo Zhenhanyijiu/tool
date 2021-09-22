@@ -232,20 +232,24 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
   oc::u64 pk0sBufSize = 0;
   int n = recv_data(server, &pubParamBuf);
   assert(n > 0);
+  printf("###接收方接收公开参数(pubParamBuf),buffer大小:%d\n", n);
   fg = psiRecv.genPK0FromNpot((oc::u8 *)pubParamBuf, n, (oc::u8 **)&pk0sBuf, &pk0sBufSize);
   assert(fg == 0);
   n = send_data(server, pk0sBuf, pk0sBufSize);
+  printf("###接收方发送128个(pk0s),buffer大小(128*33):%d\n", pk0sBufSize);
   //接收 uBuffInput,并生成matrixAD,并发送给对方
   char *uBuffInput = nullptr;
   char *matrixADBuff = nullptr;
   oc::u64 matrixADBuffSize = 0;
   n = recv_data(server, &uBuffInput);
   assert(n > 0);
+  printf("###接收方接收TxorR,buffer大小(128*128):%d\n", n);
   long start2 = start_time();
   fg = psiRecv.getSendMatrixADBuff((oc::u8 *)uBuffInput, n, recvSet,
                                    (oc::u8 **)&matrixADBuff, &matrixADBuffSize);
   assert(fg == 0);
   n = send_data(server, matrixADBuff, matrixADBuffSize);
+  printf("###接收方发送AxorD,buffer大小(2^20/8*w):%d\n", n);
   printf("===>>recv:生成MatrixAD所需时间:%ld ms\n", get_use_time(start2));
   printf("===>>recv:OT所需时间:%ld ms\n", get_use_time(start1));
   //本方生成hashMap

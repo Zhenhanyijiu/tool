@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"prigo/algo/message"
+	"runtime"
 )
 
 //./startServer -nodeId=8800 -sa=127.0.0.1:8800
@@ -24,10 +25,16 @@ func main() {
 	//ip2 := "10.100.3.16:8801"
 	url1 := "http://" + ip1 + "/v1/algo/start"
 	url2 := "http://" + ip2 + "/v1/algo/start"
-	rs := flag.Uint64("rs", 10000000, "receiver size")
-	ss := flag.Uint64("ss", 10000000, "sender size")
+	rs := flag.Uint64("rs", 5000000, "receiver size")
+	ss := flag.Uint64("ss", 5000000, "sender size")
 	flag.Parse()
-	oprfpsiparam := OprfPsiParam{ReceiverSize: *rs, SenderSize: *ss, OmpNum: 4}
+	OmpNum := runtime.NumCPU()
+	if OmpNum <= 2 {
+		OmpNum = 1
+	} else {
+		OmpNum = OmpNum / 2
+	}
+	oprfpsiparam := OprfPsiParam{ReceiverSize: *rs, SenderSize: *ss, OmpNum: OmpNum}
 	rawParam, _ := json.Marshal(&oprfpsiparam)
 	req1 := message.MsgRequest{
 		//FlowID: uu.String(),
@@ -63,7 +70,7 @@ func main() {
 		},
 		Params: rawParam,
 	}
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 1000; i++ {
 		go startOprfPsiPost(req1, url1)
 		startOprfPsiPost(req2, url2)
 	}
