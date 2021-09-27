@@ -35,7 +35,7 @@ fi
 ################C++11##############
 BLAKE2_DIR=../../libOTe/cryptoTools/cryptoTools/Crypto/blake2
 # g++ -g -std=c++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
-g++ -std=gnu++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
+g++ -g -std=gnu++11 -Wall -O2 -msse3 -msse2 -msse4.1 -maes -mpclmul \
 -DENABLE_MIRACL \
 -DOMP_POOL -DNOSOCKET_TEST \
 -I${CRYPTO_INCLUDE} -I${THIRD_INCLUDE}/miracl \

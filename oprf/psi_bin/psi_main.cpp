@@ -373,12 +373,14 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   oc::u64 pubParamBufSize = 0;
   fg = psiSender.genPublicParamFromNpot(&pubParamBuf, &pubParamBufSize);
   assert(fg == 0);
+  printf("###发送方发送pubParam,buffer大小(2*33):%d\n", pubParamBufSize);
   int n = send_data(client, (char *)pubParamBuf, pubParamBufSize);
   assert((oc::u64)n == pubParamBufSize);
   //[2]接收对方发过来的pk0sBuff
   char *pk0sBuf = nullptr;
   n = recv_data(client, &pk0sBuf);
   assert(n > 0);
+  printf("###发送方接收pk0s,buffer大小(128*33):%d\n", n);
   oc::u8 *uBuffOutput = nullptr;
   oc::u64 uBuffOutputSize = 0;
   //[3]输入pk0s，生成uBuffOutput,并发送给对方

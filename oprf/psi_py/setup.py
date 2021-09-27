@@ -34,7 +34,7 @@ def get_source_files(src_dir, str_fix='.cpp'):
 # 编译静态库libmiracl
 def compile_miracl():
     miracl_path = THIRD_INCLUDE + "/miracl/miracl/source/"
-    cmd = 'cd ' + miracl_path + " && g++ -fPIC -shared -c -m64 -O3 ./*.c -I../include " + \
+    cmd = 'cd ' + miracl_path + " && g++ -g -fPIC -shared -c -m64 -O3 ./*.c -I../include " + \
           " && ar rc libmiracl.a ./*.o" + " && rm -rf ./*.o" + " &&cd -"
     os.system(cmd)
 
@@ -63,7 +63,7 @@ def start_setup():
     # 宏定义
     define_macros = [('ENABLE_MIRACL', None), ('OMP_POOL', None), ('NDEBUG', None)]
     # 其他编译条件，-std=gnu++11,-std=c++11
-    extra_compile_args = ['-std=c++11', '-Wall', '-O2', '-fopenmp',
+    extra_compile_args = ['-g','-std=c++11', '-Wall', '-O2', '-fopenmp',
                           '-msse3', '-msse2', '-msse4.1', '-maes', '-mpclmul']
     # 链接omp
     extra_link_args = ['-lgomp']
