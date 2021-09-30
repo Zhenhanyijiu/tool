@@ -197,6 +197,24 @@ void generateDataFromFile(const char *inFile, vector<vector<oc::u8>> &dataSet, i
   printf("===>>i:%d\n", i);
   assert(i == dataSetSize);
 }
+void print_param(const char *pre_fix, const char *buf, unsigned int num)
+{
+  printf("%s:", pre_fix);
+  for (int i = 0; i < num; i++)
+  {
+    char tmp = buf[i] & 0xf0;
+    if (tmp == 0)
+    {
+      printf("%x", (char)0);
+      printf("%x", (unsigned char)(buf[i]));
+    }
+    else
+    {
+      printf("%x", (unsigned char)(buf[i]));
+    }
+  }
+  printf("\n");
+}
 void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
                   oc::u64_t senderSize, oc::u64_t ids, string address, int port,
                   oc::u8_t *commonSeed, oc::u64_t matrixWidth,
@@ -233,23 +251,25 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
   int n = recv_data(server, &pubParamBuf);
   assert(n > 0);
   printf("###接收方接收公开参数(pubParamBuf),buffer大小:%d\n", n);
+  print_param("###pubParam", (char *)pubParamBuf, n);
   fg = psiRecv.genPK0FromNpot((oc::u8 *)pubParamBuf, n, (oc::u8 **)&pk0sBuf, &pk0sBufSize);
   assert(fg == 0);
   n = send_data(server, pk0sBuf, pk0sBufSize);
-  printf("###接收方发送128个(pk0s),buffer大小(128*33):%d\n", pk0sBufSize);
+  printf("###接收方发送128个(pk0s),buffer大小(128*33B):%ld\n", pk0sBufSize);
+  print_param("###pubParam", pk0sBuf, (int)pk0sBufSize);
   //接收 uBuffInput,并生成matrixAD,并发送给对方
   char *uBuffInput = nullptr;
   char *matrixADBuff = nullptr;
   oc::u64 matrixADBuffSize = 0;
   n = recv_data(server, &uBuffInput);
   assert(n > 0);
-  printf("###接收方接收TxorR,buffer大小(128*128):%d\n", n);
+  printf("###接收方接收TxorR,buffer大小(128*128B):%d\n", n);
   long start2 = start_time();
   fg = psiRecv.getSendMatrixADBuff((oc::u8 *)uBuffInput, n, recvSet,
                                    (oc::u8 **)&matrixADBuff, &matrixADBuffSize);
   assert(fg == 0);
   n = send_data(server, matrixADBuff, matrixADBuffSize);
-  printf("###接收方发送AxorD,buffer大小(2^20/8*w):%d\n", n);
+  printf("###接收方发送AxorD,buffer大小(2^20/8*w B):%ld\n", matrixADBuffSize);
   printf("===>>recv:生成MatrixAD所需时间:%ld ms\n", get_use_time(start2));
   printf("===>>recv:OT所需时间:%ld ms\n", get_use_time(start1));
   //本方生成hashMap
@@ -262,9 +282,9 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
   // char *hashOutput = nullptr;
   vector<oc::u32> psiMsgIndexs;
   int totalCyc = senderSize / bucket2ForComputeH2Output;
-  printf("===>>sendersize:%ld,bucket2ForComputeH2Output:%d,totalCyc:%d\n",
+  printf("===>>sendersize:%ld,bucket2ForComputeH2Output:%ld,totalCyc:%d\n",
          senderSize, bucket2ForComputeH2Output, totalCyc);
-  int count = 0, countTmp = 10;
+  int count = 0, countTmp = 1;
   long int start00;
   for (; psiRecv.isRecvEnd() == 0;)
   {
@@ -288,6 +308,10 @@ void recv_process(string inFile, string outFile, oc::u64_t receiverSize,
     if (count < countTmp)
     {
       printf("count:%d,recv:接收一次H2Ouput所需时间:%ldms\n", count, get_use_time(start00));
+    }
+    if (count < countTmp)
+    {
+      printf("###接收方每次接收数据,buffer大小(10240*10B):%d\n", n);
     }
 #if (defined NOMP) || (defined OMP_ONLY)
     vector<oc::u32> psiMsgIndexsTmp;
@@ -373,7 +397,8 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   oc::u64 pubParamBufSize = 0;
   fg = psiSender.genPublicParamFromNpot(&pubParamBuf, &pubParamBufSize);
   assert(fg == 0);
-  printf("###发送方发送pubParam,buffer大小(2*33):%d\n", pubParamBufSize);
+  printf("###发送方发送pubParam,buffer大小(2*33):%ld\n", pubParamBufSize);
+  // print_param("###pubParam", (char *)pubParamBuf, (int)pubParamBufSize);
   int n = send_data(client, (char *)pubParamBuf, pubParamBufSize);
   assert((oc::u64)n == pubParamBufSize);
   //[2]接收对方发过来的pk0sBuff
@@ -381,6 +406,7 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   n = recv_data(client, &pk0sBuf);
   assert(n > 0);
   printf("###发送方接收pk0s,buffer大小(128*33):%d\n", n);
+  // print_param("###pubParam", pk0sBuf, n);
   oc::u8 *uBuffOutput = nullptr;
   oc::u64 uBuffOutputSize = 0;
   //[3]输入pk0s，生成uBuffOutput,并发送给对方
@@ -390,6 +416,7 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   assert(fg == 0);
   n = send_data(client, (char *)uBuffOutput, uBuffOutputSize);
   assert((oc::u64)n == uBuffOutputSize);
+  printf("###发送方发送TxorR矩阵,buffer大小(128*128B):%ld\n", uBuffOutputSize);
   //计算H1 start（避免等待）
   printf("===>>发送方避免等待，开始计算hash1...\n");
   fg = psiSender.computeAllHashOutputByH1(sendSet);
@@ -401,6 +428,7 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   n = recv_data(client, &matrixAxorD);
   assert(n > 0);
   printf("===>>接收收到matrixAxorD用时:%ld ms\n", get_use_time(start_recv_AD));
+  printf("###发送方接收AxorD矩阵,buffer大小(2^20/8 * w B):%d\n", n);
   //恢复矩阵C
   long start3 = start_time();
   fg = psiSender.recoverMatrixC((oc::u8 *)matrixAxorD, n);
@@ -412,7 +440,7 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
   oc::u64 hashOutputOnceBuffSize = 0;
   oc::u8 *hashOutputOnceBuff = nullptr;
   int totalCyc = senderSize / bucket2ForComputeH2Output;
-  int count = 0, countTmp = 10;
+  int count = 0, countTmp = 1;
   int ret = psiSender.isSendEnd();
   printf("===>>isSendEnd:%d\n", ret);
   // for (auto low = 0; low < senderSize;low+=bucket2ForComputeH2Output)
@@ -439,6 +467,10 @@ void send_process(string inFile, string outFile, oc::u64_t receiverSize,
     if (count < countTmp)
     {
       printf("count:%d,send:计算一次H2Output并发送所需时间:%ldms\n", count, get_use_time(start00));
+    }
+    if (count < countTmp)
+    {
+      printf("###发送方每次发送数据,buffer大小(10240*10 B):%ld\n", hashOutputOnceBuffSize);
     }
     count++;
   }
@@ -544,6 +576,7 @@ int main(int argc, char **argv)
   oc::u8_t commonSeed[16];
   memset(commonSeed, 0, 16);
   memcpy(commonSeed, (oc::u8_t *)&comSeed, 8);
+  memcpy(commonSeed + 8, (oc::u8_t *)&comSeed, 8);
   for (int i = 0; i < 1; i++)
   {
     long start0 = start_time();
