@@ -21,7 +21,7 @@ void *new_psi_sender(char *common_seed, ui64 sender_size, int omp_num)
     psi_s->sender_size = sender_size;
     oc::PsiSender *sender = new oc::PsiSender;
     int ret = sender->init((oc::u8_t *)common_seed, sender_size,
-                           128, 20, omp_num, 10, 10240);
+                           128, 20, omp_num, 10, 256);
     if (ret)
     {
         free(psi_s);
@@ -120,7 +120,7 @@ void *new_psi_receiver(char *common_seed, ui64 receiver_size, ui64 sender_size, 
     psi_r->receiver_size = receiver_size;
     oc::PsiReceiver *receiver = new oc::PsiReceiver;
     int ret = receiver->init((oc::u8_t *)common_seed, receiver_size, sender_size,
-                             128, 20, omp_num, 10, 10240);
+                             128, 20, omp_num, 10, 256);
     if (ret)
     {
         free(psi_r);

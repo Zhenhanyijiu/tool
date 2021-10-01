@@ -74,21 +74,6 @@ func SendData(tar_url string, key string, data []byte) {
 		Data: data,
 	}
 	dataJson, _ := json.Marshal(&req)
-	//dur := time.Tick(time.Duration(3) * time.Second)
-	//cyc:
-	//	for {
-	//		select {
-	//		case <-dur:
-	//			fmt.Printf("===send data timeout!!!\n")
-	//			break cyc
-	//		default:
-	//			rsp, err := BigCacheGlobal.cli.Post(tar_url, "application/json", bytes.NewReader(dataJson))
-	//			if err == nil {
-	//				rsp.Body.Close()
-	//				return
-	//			}
-	//		}
-	//	}
 	rsp, err := BigCacheGlobal.cli.Post(tar_url, "application/json", bytes.NewReader(dataJson))
 	if err != nil {
 		message.Log.Errorf("===>>send data error:%v", err)
